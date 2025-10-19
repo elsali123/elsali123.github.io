@@ -1,73 +1,642 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Coming Soon</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS Portfolio</title>
     <style>
-      :root{
-        --bg1: #0f172a; /* dark navy */
-        --bg2: #0b1220; /* deeper navy */
-        --card: rgba(255,255,255,0.04);
-        --accent: linear-gradient(90deg,#8b5cf6,#06b6d4);
-        --muted: rgba(255,255,255,0.7);
-        --glass: rgba(255,255,255,0.03);
-      }
-      html,body{height:100%;margin:0;font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
-      body{
-        background: radial-gradient(1200px 600px at 10% 20%, rgba(11,66,110,0.28), transparent),
-                    radial-gradient(900px 400px at 90% 80%, rgba(134,85,255,0.12), transparent),
-                    linear-gradient(180deg,var(--bg1),var(--bg2));
-        color: #ffffff;
-        display:flex;align-items:center;justify-content:center;padding:32px;
-      }
-      .card{
-        max-width:760px;width:100%;text-align:center;padding:48px;border-radius:18px;
-        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-        box-shadow: 0 10px 30px rgba(2,6,23,0.6);
-        border: 1px solid rgba(255,255,255,0.04);
-        backdrop-filter: blur(6px);
-      }
-      h1{font-size:clamp(28px,4vw,44px);margin:0 0 12px;letter-spacing:-0.02em;}
-      p.lead{margin:0 0 18px;color:var(--muted);font-size:clamp(14px,2vw,18px)}
-      .link-row{display:flex;gap:12px;justify-content:center;align-items:center;margin-top:20px;}
-      a.link{
-        display:inline-block;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:600;
-        background:var(--glass);border:1px solid rgba(255,255,255,0.04);
-      }
-      .btn-primary{
-        background:var(--accent);background-clip:padding-box;color:#fff;box-shadow:0 6px 20px rgba(11,60,120,0.28);
-      }
-      .small{font-size:13px;color:rgba(255,255,255,0.6);margin-top:14px}
-      .logo{
-        width:64px;height:64px;border-radius:12px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;
-        background:linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-        border:1px solid rgba(255,255,255,0.03);
-        box-shadow: inset 0 -6px 16px rgba(255,255,255,0.01);
-      }
-      .logo svg{display:block}
-      @media (max-width:420px){.card{padding:28px;border-radius:14px}}
-    </style>
-  </head>
-  <body>
-    <main class="card" role="main">
-      <div class="logo" aria-hidden>
-        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="2" width="20" height="20" rx="5" fill="url(#g)"/>
-          <defs>
-            <linearGradient id="g" x1="0" x2="1">
-              <stop offset="0" stop-color="#8b5cf6" />
-              <stop offset="1" stop-color="#06b6d4" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </div>
-      <h1>Coming Soon!</h1>
-      <p class="lead">Hi :D Thanks for stopping by! </p>
-      <p class="lead"> My website is still under construction, but feel free to check out my Linkedin below :)- Elsa </p>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-      <div class="link-row">
-        <a class="link btn-primary" href="https://www.linkedin.com/in/elsa-li-hmc/" target="_blank" rel="noopener noreferrer">Let's Connect!</a>
-      </div>
-    </main>
-  </body>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #201b5e 0%, #3a2f8f 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        header {
+            padding: 3rem 2rem;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .profile-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .profile-image {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 4px solid #ffd700;
+            object-fit: cover;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 1rem;
+            animation: fadeIn 1s ease-in;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            animation: fadeIn 1s ease-in;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            animation: fadeIn 1.5s ease-in;
+        }
+
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            padding: 1.5rem;
+            background: rgba(0, 0, 0, 0.15);
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            color: #fff;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        nav a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        nav a.active {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        .section {
+            margin-bottom: 4rem;
+        }
+
+        .section h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #ffd700;
+            padding-bottom: 0.5rem;
+            color: #ebe9ff;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .project-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 2rem;
+            transition: all 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .project-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #ffd700;
+        }
+
+        .project-card p {
+            line-height: 1.6;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+
+        .tech-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .tag {
+            background: #ffd700;
+            color: #201b5e;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .about-content {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 2rem;
+            line-height: 1.8;
+        }
+
+        .project-detail {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 2rem;
+            line-height: 1.8;
+        }
+
+        .project-detail h3 {
+            font-size: 1.8rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .project-detail ul {
+            margin-left: 2rem;
+            margin-top: 1rem;
+        }
+
+        .project-detail li {
+            margin-bottom: 0.5rem;
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-bottom: 2rem;
+            padding: 0.7rem 1.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            text-decoration: none;
+            color: #fff;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(-5px);
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.2);
+            margin-top: 3rem;
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .social-links a {
+            color: #fff;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .social-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="profile-section">
+            
+            <div class="profile-image">
+                <img src="profile.jpg">
+
+            </div>
+            <div>
+                <h1>Your Name</h1>
+                <p class="subtitle">Software Engineer | NLP & ML Enthusiast</p>
+            </div>
+        </div>
+    </header>
+
+    <nav>
+        <a class="nav-link active" data-page="home">Home</a>
+        <a class="nav-link" data-page="about">About</a>
+        <a class="nav-link" data-page="contact">Contact</a>
+    </nav>
+
+    <!-- Home Page -->
+    <div id="home" class="page active">
+        <div class="container">
+            <section class="section">
+                <h2>Welcome</h2>
+                <div class="about-content">
+                    <p>Welcome to my portfolio! I'm a software engineer passionate about natural language processing, machine learning, and building impactful solutions. From developing RAG-based LLM systems to creating award-winning applications, I love tackling challenging problems with innovative technology.</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Projects</h2>
+                <div class="projects-grid">
+                    <div class="project-card" onclick="showProject('rag-system')">
+                        <h3>Agroforestry RAG System</h3>
+                        <p>RAG-based LLM system processing 2,000+ research papers, automating literature review for agroforestry queries.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">ChromaDB</span>
+                            <span class="tag">Qwen</span>
+                            <span class="tag">NLP</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('lpg-detection')">
+                        <h3>LPG Tank Fraud Detection</h3>
+                        <p>Patented computer vision algorithm with 70% accuracy for detecting fraudulent liquid petroleum gas tanks using OpenCV.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">OpenCV</span>
+                            <span class="tag">Computer Vision</span>
+                            <span class="tag">Patent</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('ecobuddies')">
+                        <h3>EcoBuddies</h3>
+                        <p>Award-winning interactive app promoting environmentalism. Won Best Use of Streamlit at Caltech's Hacktech 2025.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Streamlit</span>
+                            <span class="tag">Gemini API</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('rainforest-revival')">
+                        <h3>Rainforest Revival</h3>
+                        <p>Award-winning game with 3 mini-games and AI chatbot integration. Won Most Unique Game at SEO First Year Academy.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Pygame</span>
+                            <span class="tag">Gemini API</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('polygraph')">
+                        <h3>Polygraph Lie Detection</h3>
+                        <p>Multimodal lie detection system using NLP and computer vision sentiment analysis to identify deception in videos.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">NLP</span>
+                            <span class="tag">Computer Vision</span>
+                            <span class="tag">Google Cloud</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- About Page -->
+    <div id="about" class="page">
+        <div class="container">
+            <section class="section">
+                <h2>About Me</h2>
+                <div class="about-content">
+                    <p>I'm a software engineer with experience in natural language processing, machine learning, and full-stack development. I'm passionate about leveraging AI and data-driven solutions to solve real-world problems.</p>
+                    <p>My work spans from building RAG-based LLM systems for environmental research to developing patented computer vision algorithms for safety applications. I've been fortunate to work with organizations like The Nature Conservancy, Yujun Venture Capital, and Shenzhen Lanyang Technology.</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Experience</h2>
+                <div class="about-content">
+                    <h3 style="color: #ffd700; margin-top: 1.5rem;">Software Engineer Summer Analyst</h3>
+                    <p style="opacity: 0.8; margin-bottom: 0.5rem;">Yujun Venture Capital Management | July 2025 - August 2025</p>
+                    <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <li>Built web scraper to consolidate public company information into dataset, accelerating pre-investment research</li>
+                        <li>Applied scraper to gather and analyze market trends across perfume companies, delivering key findings to investors</li>
+                    </ul>
+
+                    <h3 style="color: #ffd700; margin-top: 1.5rem;">Software Engineer Intern</h3>
+                    <p style="opacity: 0.8; margin-bottom: 0.5rem;">The Nature Conservancy | May 2025 - July 2025</p>
+                    <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <li>Developed RAG-based LLM system using ChromaDB and Qwen to process 2,000+ agroforestry research papers</li>
+                        <li>Created benchmarking dataset of ~7,000 unique questions to test agroforestry RAG systems</li>
+                        <li>Designed regex-based text segmentation system to optimize article preprocessing for RAG retrieval</li>
+                    </ul>
+
+                    <h3 style="color: #ffd700; margin-top: 1.5rem;">NLP Research Assistant</h3>
+                    <p style="opacity: 0.8; margin-bottom: 0.5rem;">Harvey Mudd College | January 2025 - May 2025</p>
+                    <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <li>Implemented supervised ML models (MultinomialNB, ComplementNB, Logistic Regression) to analyze perfume reviews</li>
+                        <li>Visualized data using confusion matrices and analyzed precision, recall, and F1 scores</li>
+                    </ul>
+
+                    <h3 style="color: #ffd700; margin-top: 1.5rem;">Software Engineer Intern</h3>
+                    <p style="opacity: 0.8; margin-bottom: 0.5rem;">Shenzhen Lanyang Technology | May 2024 - July 2024</p>
+                    <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <li>Patented novel image comparison algorithm with 70% accuracy for fraudulent LPG tank detection using OpenCV</li>
+                        <li>Reduced implementation costs by 80%, making safe tank detection accessible to low-income families in China</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Affiliations</h2>
+                <div class="about-content">
+                    <p><strong style="color: #ffd700;">Sponsors for Educational Opportunity (SEO)</strong> - First Year Academy</p>
+                    <p style="margin-top: 0.5rem;">Selected as 1 of 100 students from a highly competitive applicant pool | February 2025 - August 2025</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Weather Dashboard Project Detail -->
+    <div id="weather-dashboard" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('home')">← Back to Home</a>
+            <section class="section">
+                <h2>Weather Dashboard</h2>
+                <div class="project-detail">
+                    <p>The Weather Dashboard is a comprehensive web application that provides users with real-time weather information and forecasts for any location worldwide.</p>
+                    
+                    <h3>Features</h3>
+                    <ul>
+                        <li>Real-time weather data including temperature, humidity, wind speed, and conditions</li>
+                        <li>5-day weather forecast with hourly breakdowns</li>
+                        <li>Interactive charts displaying temperature trends and precipitation probability</li>
+                        <li>Search functionality for cities worldwide</li>
+                        <li>Responsive design that works seamlessly on desktop and mobile devices</li>
+                        <li>Location-based weather using geolocation API</li>
+                    </ul>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">React</span>
+                        <span class="tag">OpenWeather API</span>
+                        <span class="tag">Chart.js</span>
+                        <span class="tag">CSS3</span>
+                        <span class="tag">Axios</span>
+                    </div>
+
+                    <h3>Challenges & Solutions</h3>
+                    <p>One of the main challenges was handling API rate limits and optimizing requests. I implemented caching mechanisms to store recent searches and reduce unnecessary API calls. Additionally, creating smooth animations for weather transitions required careful state management in React.</p>
+
+                    <h3>Future Improvements</h3>
+                    <ul>
+                        <li>Add weather alerts and notifications</li>
+                        <li>Implement multiple location tracking</li>
+                        <li>Include air quality index data</li>
+                        <li>Add weather map visualization</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Task Manager Project Detail -->
+    <div id="task-manager" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('projects')">← Back to Projects</a>
+            <section class="section">
+                <h2>Task Manager App</h2>
+                <div class="project-detail">
+                    <p>A full-stack task management application designed to help users organize their daily tasks efficiently with priority levels, categories, and due dates.</p>
+                    
+                    <h3>Features</h3>
+                    <ul>
+                        <li>User authentication and authorization with JWT</li>
+                        <li>Create, read, update, and delete tasks (CRUD operations)</li>
+                        <li>Priority levels (High, Medium, Low) with color coding</li>
+                        <li>Task categories and tags for better organization</li>
+                        <li>Due date reminders and notifications</li>
+                        <li>Search and filter functionality</li>
+                        <li>Progress tracking with completion statistics</li>
+                    </ul>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">Node.js</span>
+                        <span class="tag">Express</span>
+                        <span class="tag">MongoDB</span>
+                        <span class="tag">Mongoose</span>
+                        <span class="tag">JWT</span>
+                        <span class="tag">React</span>
+                    </div>
+
+                    <h3>Technical Highlights</h3>
+                    <p>The application uses RESTful API architecture with proper error handling and validation. User passwords are securely hashed using bcrypt, and authentication is managed through JSON Web Tokens. The MongoDB database is optimized with proper indexing for fast query performance.</p>
+
+                    <h3>What I Learned</h3>
+                    <p>This project taught me the importance of security best practices, database design, and state management in full-stack applications. I also gained experience in deploying applications and managing environment variables.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Algorithm Visualizer Project Detail -->
+    <div id="algorithm-visualizer" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('projects')">← Back to Projects</a>
+            <section class="section">
+                <h2>Algorithm Visualizer</h2>
+                <div class="project-detail">
+                    <p>An interactive educational tool that brings algorithms to life through visual animations, making it easier to understand how different algorithms work step by step.</p>
+                    
+                    <h3>Supported Algorithms</h3>
+                    <ul>
+                        <li><strong>Sorting:</strong> Bubble Sort, Quick Sort, Merge Sort, Insertion Sort, Selection Sort</li>
+                        <li><strong>Pathfinding:</strong> Dijkstra's Algorithm, A* Search, Breadth-First Search, Depth-First Search</li>
+                        <li><strong>Graph Algorithms:</strong> Minimum Spanning Tree (Prim's and Kruskal's)</li>
+                    </ul>
+
+                    <h3>Features</h3>
+                    <ul>
+                        <li>Real-time visualization with adjustable animation speed</li>
+                        <li>Step-by-step execution with pause and resume controls</li>
+                        <li>Customizable array sizes and grid dimensions</li>
+                        <li>Color-coded visualization showing comparisons, swaps, and paths</li>
+                        <li>Performance metrics including time complexity and operation count</li>
+                        <li>Mobile-responsive canvas implementation</li>
+                    </ul>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">JavaScript</span>
+                        <span class="tag">HTML5 Canvas</span>
+                        <span class="tag">CSS3</span>
+                        <span class="tag">Data Structures</span>
+                    </div>
+
+                    <h3>Implementation Details</h3>
+                    <p>The visualizer uses the HTML5 Canvas API for rendering, with requestAnimationFrame for smooth animations. Each algorithm is implemented using async/await patterns to allow for pausable execution. The pathfinding grid uses a 2D array representation with node objects containing state information.</p>
+
+                    <h3>Educational Impact</h3>
+                    <p>This project has been used by students to better understand algorithm behavior and time complexity concepts. The visual feedback helps identify performance differences between algorithms and reinforces theoretical knowledge with practical demonstration.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Portfolio Website Project Detail -->
+    <div id="portfolio-website" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('projects')">← Back to Projects</a>
+            <section class="section">
+                <h2>Portfolio Website</h2>
+                <div class="project-detail">
+                    <p>A modern, responsive portfolio website designed to showcase my projects, skills, and experience in an engaging and professional manner.</p>
+                    
+                    <h3>Features</h3>
+                    <ul>
+                        <li>Clean, modern design with smooth animations</li>
+                        <li>Fully responsive layout for all device sizes</li>
+                        <li>Multi-page navigation with detailed project pages</li>
+                        <li>Optimized performance with fast load times</li>
+                        <li>SEO-friendly structure</li>
+                        <li>Contact form integration</li>
+                        <li>Social media integration</li>
+                    </ul>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">HTML5</span>
+                        <span class="tag">CSS3</span>
+                        <span class="tag">JavaScript</span>
+                        <span class="tag">Responsive Design</span>
+                    </div>
+
+                    <h3>Design Philosophy</h3>
+                    <p>The design emphasizes simplicity and readability while maintaining visual interest through subtle animations and color transitions. The navigation system uses JavaScript for smooth page transitions without full page reloads, creating a single-page application experience.</p>
+
+                    <h3>Technical Approach</h3>
+                    <p>The website uses vanilla JavaScript for navigation and interactions, avoiding unnecessary dependencies for better performance. CSS Grid and Flexbox are used for layouts, ensuring consistent rendering across browsers. The color scheme is carefully chosen to maintain good contrast and accessibility.</p>
+
+                    <h3>Performance Optimization</h3>
+                    <ul>
+                        <li>Optimized images with proper compression</li>
+                        <li>Minimal JavaScript for faster parsing</li>
+                        <li>CSS animations using GPU-accelerated properties</li>
+                        <li>Lazy loading for images</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Contact Page -->
+    <div id="contact" class="page">
+        <div class="container">
+            <section class="section">
+                <h2>Get In Touch</h2>
+                <div class="about-content">
+                    <p>I'm always open to new opportunities and collaborations. Feel free to reach out!</p>
+                    <div class="social-links">
+                        <a href="mailto:your.email@example.com">Email</a>
+                        <a href="#">GitHub</a>
+                        <a href="#">LinkedIn</a>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Your Name. All rights reserved.</p>
+    </footer>
+
+    <script>
+        function showPage(pageId) {
+            // Hide all pages
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.remove('active'));
+            
+            // Show selected page
+            document.getElementById(pageId).classList.add('active');
+            
+            // Update nav active state
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => link.classList.remove('active'));
+            
+            const activeLink = document.querySelector(`[data-page="${pageId}"]`);
+            if (activeLink) {
+                activeLink.classList.add('active');
+            }
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        function showProject(projectId) {
+            showPage(projectId);
+        }
+
+        // Add click handlers to nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const pageId = this.getAttribute('data-page');
+                showPage(pageId);
+            });
+        });
+    </script>
+</body>
+</html>
