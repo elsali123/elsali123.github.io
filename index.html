@@ -180,6 +180,7 @@
             font-size: 1.8rem;
             margin-top: 2rem;
             margin-bottom: 1rem;
+            color: #ebe9ff;
         }
 
         .project-detail ul {
@@ -266,11 +267,7 @@
 <body>
     <header>
         <div class="profile-section">
-            
-            <div class="profile-image">
-                <img src="profile.jpg">
-
-            </div>
+            <img src="your-photo.jpg" alt="Your Name" class="profile-image">
             <div>
                 <h1>Your Name</h1>
                 <p class="subtitle">Software Engineer | NLP & ML Enthusiast</p>
@@ -290,7 +287,7 @@
             <section class="section">
                 <h2>Welcome</h2>
                 <div class="about-content">
-                    <p>Welcome to my portfolio! I'm a software engineer passionate about natural language processing, machine learning, and building impactful solutions. From developing RAG-based LLM systems to creating award-winning applications, I love tackling challenging problems with innovative technology.</p>
+                    <p>Welcome to my portfolio! I'm a software engineer passionate about natural language processing, machine learning, and building impactful solutions. From developing RAG-based LLM systems for environmental research to creating award-winning applications, I love tackling challenging problems with innovative technology.</p>
                 </div>
             </section>
 
@@ -409,174 +406,215 @@
         </div>
     </div>
 
-    <!-- Weather Dashboard Project Detail -->
-    <div id="weather-dashboard" class="page">
+    <!-- RAG System Project Detail -->
+    <div id="rag-system" class="page">
         <div class="container">
             <a class="back-button" onclick="showPage('home')">← Back to Home</a>
             <section class="section">
-                <h2>Weather Dashboard</h2>
+                <h2>Agroforestry RAG System</h2>
                 <div class="project-detail">
-                    <p>The Weather Dashboard is a comprehensive web application that provides users with real-time weather information and forecasts for any location worldwide.</p>
+                    <p>A sophisticated Retrieval-Augmented Generation (RAG) system developed at The Nature Conservancy to automate literature review processes for agroforestry research. The system processes over 2,000 research papers to provide domain-specific answers to complex queries.</p>
                     
-                    <h3>Features</h3>
+                    <h3>Organization</h3>
+                    <p style="color: #ffd700; font-weight: 600;">The Nature Conservancy | May 2025 - July 2025</p>
+
+                    <h3>Key Achievements</h3>
                     <ul>
-                        <li>Real-time weather data including temperature, humidity, wind speed, and conditions</li>
-                        <li>5-day weather forecast with hourly breakdowns</li>
-                        <li>Interactive charts displaying temperature trends and precipitation probability</li>
-                        <li>Search functionality for cities worldwide</li>
-                        <li>Responsive design that works seamlessly on desktop and mobile devices</li>
-                        <li>Location-based weather using geolocation API</li>
+                        <li>Processed 2,000+ agroforestry research papers using RAG architecture</li>
+                        <li>Created benchmarking dataset of ~7,000 unique questions for system evaluation</li>
+                        <li>Developed regex-based text segmentation for optimized article preprocessing</li>
+                        <li>Automated literature review process, significantly reducing research time</li>
                     </ul>
 
                     <h3>Technologies Used</h3>
                     <div class="tech-tags">
-                        <span class="tag">React</span>
-                        <span class="tag">OpenWeather API</span>
-                        <span class="tag">Chart.js</span>
-                        <span class="tag">CSS3</span>
-                        <span class="tag">Axios</span>
+                        <span class="tag">Python</span>
+                        <span class="tag">ChromaDB</span>
+                        <span class="tag">Qwen LLM</span>
+                        <span class="tag">RAG Architecture</span>
+                        <span class="tag">NLP</span>
+                        <span class="tag">Regex</span>
                     </div>
 
-                    <h3>Challenges & Solutions</h3>
-                    <p>One of the main challenges was handling API rate limits and optimizing requests. I implemented caching mechanisms to store recent searches and reduce unnecessary API calls. Additionally, creating smooth animations for weather transitions required careful state management in React.</p>
+                    <h3>Technical Architecture</h3>
+                    <p>The system uses ChromaDB as a vector database to store embeddings of research papers. When a query is received, the RAG system retrieves the most relevant document chunks and uses the Qwen language model to generate comprehensive, contextually accurate answers. The regex-based preprocessing pipeline ensures clean, well-structured text for optimal retrieval performance.</p>
 
-                    <h3>Future Improvements</h3>
-                    <ul>
-                        <li>Add weather alerts and notifications</li>
-                        <li>Implement multiple location tracking</li>
-                        <li>Include air quality index data</li>
-                        <li>Add weather map visualization</li>
-                    </ul>
+                    <h3>Benchmarking Dataset</h3>
+                    <p>To evaluate system performance, I created a comprehensive dataset of approximately 7,000 unique questions covering various aspects of agroforestry. This dataset serves as a robust benchmark for testing retrieval accuracy and answer quality, and can be used to compare different RAG implementations.</p>
+
+                    <h3>Impact</h3>
+                    <p>This system dramatically accelerates the research process for agroforestry experts at The Nature Conservancy, enabling them to quickly find relevant information across thousands of papers. The automated literature review capability supports more efficient decision-making for conservation and sustainable agriculture initiatives.</p>
                 </div>
             </section>
         </div>
     </div>
 
-    <!-- Task Manager Project Detail -->
-    <div id="task-manager" class="page">
+    <!-- LPG Detection Project Detail -->
+    <div id="lpg-detection" class="page">
         <div class="container">
-            <a class="back-button" onclick="showPage('projects')">← Back to Projects</a>
+            <a class="back-button" onclick="showPage('home')">← Back to Home</a>
             <section class="section">
-                <h2>Task Manager App</h2>
+                <h2>LPG Tank Fraud Detection</h2>
                 <div class="project-detail">
-                    <p>A full-stack task management application designed to help users organize their daily tasks efficiently with priority levels, categories, and due dates.</p>
+                    <p>A patented computer vision algorithm developed to detect fraudulent liquid petroleum gas (LPG) tanks, preventing the illegal sale of hazardous units. This project achieved 70% accuracy in identifying counterfeit tanks while reducing implementation costs by 80%, making safety technology accessible to low-income families in China.</p>
                     
-                    <h3>Features</h3>
+                    <h3>Organization</h3>
+                    <p style="color: #ffd700; font-weight: 600;">Shenzhen Lanyang Technology | May 2024 - July 2024</p>
+
+                    <h3>Key Achievements</h3>
                     <ul>
-                        <li>User authentication and authorization with JWT</li>
-                        <li>Create, read, update, and delete tasks (CRUD operations)</li>
-                        <li>Priority levels (High, Medium, Low) with color coding</li>
-                        <li>Task categories and tags for better organization</li>
-                        <li>Due date reminders and notifications</li>
-                        <li>Search and filter functionality</li>
-                        <li>Progress tracking with completion statistics</li>
+                        <li>Patented novel image comparison algorithm for fraud detection</li>
+                        <li>Achieved 70% accuracy in identifying fraudulent LPG tanks</li>
+                        <li>Reduced implementation costs by 80% compared to existing solutions</li>
+                        <li>Made safe tank detection accessible to low-income families in China</li>
+                        <li>Prevented sale of hazardous counterfeit units</li>
                     </ul>
 
                     <h3>Technologies Used</h3>
                     <div class="tech-tags">
-                        <span class="tag">Node.js</span>
-                        <span class="tag">Express</span>
-                        <span class="tag">MongoDB</span>
-                        <span class="tag">Mongoose</span>
-                        <span class="tag">JWT</span>
-                        <span class="tag">React</span>
+                        <span class="tag">Python</span>
+                        <span class="tag">OpenCV</span>
+                        <span class="tag">Computer Vision</span>
+                        <span class="tag">Image Processing</span>
+                        <span class="tag">Patent</span>
                     </div>
-
-                    <h3>Technical Highlights</h3>
-                    <p>The application uses RESTful API architecture with proper error handling and validation. User passwords are securely hashed using bcrypt, and authentication is managed through JSON Web Tokens. The MongoDB database is optimized with proper indexing for fast query performance.</p>
-
-                    <h3>What I Learned</h3>
-                    <p>This project taught me the importance of security best practices, database design, and state management in full-stack applications. I also gained experience in deploying applications and managing environment variables.</p>
-                </div>
-            </section>
-        </div>
-    </div>
-
-    <!-- Algorithm Visualizer Project Detail -->
-    <div id="algorithm-visualizer" class="page">
-        <div class="container">
-            <a class="back-button" onclick="showPage('projects')">← Back to Projects</a>
-            <section class="section">
-                <h2>Algorithm Visualizer</h2>
-                <div class="project-detail">
-                    <p>An interactive educational tool that brings algorithms to life through visual animations, making it easier to understand how different algorithms work step by step.</p>
-                    
-                    <h3>Supported Algorithms</h3>
-                    <ul>
-                        <li><strong>Sorting:</strong> Bubble Sort, Quick Sort, Merge Sort, Insertion Sort, Selection Sort</li>
-                        <li><strong>Pathfinding:</strong> Dijkstra's Algorithm, A* Search, Breadth-First Search, Depth-First Search</li>
-                        <li><strong>Graph Algorithms:</strong> Minimum Spanning Tree (Prim's and Kruskal's)</li>
-                    </ul>
-
-                    <h3>Features</h3>
-                    <ul>
-                        <li>Real-time visualization with adjustable animation speed</li>
-                        <li>Step-by-step execution with pause and resume controls</li>
-                        <li>Customizable array sizes and grid dimensions</li>
-                        <li>Color-coded visualization showing comparisons, swaps, and paths</li>
-                        <li>Performance metrics including time complexity and operation count</li>
-                        <li>Mobile-responsive canvas implementation</li>
-                    </ul>
-
-                    <h3>Technologies Used</h3>
-                    <div class="tech-tags">
-                        <span class="tag">JavaScript</span>
-                        <span class="tag">HTML5 Canvas</span>
-                        <span class="tag">CSS3</span>
-                        <span class="tag">Data Structures</span>
-                    </div>
-
-                    <h3>Implementation Details</h3>
-                    <p>The visualizer uses the HTML5 Canvas API for rendering, with requestAnimationFrame for smooth animations. Each algorithm is implemented using async/await patterns to allow for pausable execution. The pathfinding grid uses a 2D array representation with node objects containing state information.</p>
-
-                    <h3>Educational Impact</h3>
-                    <p>This project has been used by students to better understand algorithm behavior and time complexity concepts. The visual feedback helps identify performance differences between algorithms and reinforces theoretical knowledge with practical demonstration.</p>
-                </div>
-            </section>
-        </div>
-    </div>
-
-    <!-- Portfolio Website Project Detail -->
-    <div id="portfolio-website" class="page">
-        <div class="container">
-            <a class="back-button" onclick="showPage('projects')">← Back to Projects</a>
-            <section class="section">
-                <h2>Portfolio Website</h2>
-                <div class="project-detail">
-                    <p>A modern, responsive portfolio website designed to showcase my projects, skills, and experience in an engaging and professional manner.</p>
-                    
-                    <h3>Features</h3>
-                    <ul>
-                        <li>Clean, modern design with smooth animations</li>
-                        <li>Fully responsive layout for all device sizes</li>
-                        <li>Multi-page navigation with detailed project pages</li>
-                        <li>Optimized performance with fast load times</li>
-                        <li>SEO-friendly structure</li>
-                        <li>Contact form integration</li>
-                        <li>Social media integration</li>
-                    </ul>
-
-                    <h3>Technologies Used</h3>
-                    <div class="tech-tags">
-                        <span class="tag">HTML5</span>
-                        <span class="tag">CSS3</span>
-                        <span class="tag">JavaScript</span>
-                        <span class="tag">Responsive Design</span>
-                    </div>
-
-                    <h3>Design Philosophy</h3>
-                    <p>The design emphasizes simplicity and readability while maintaining visual interest through subtle animations and color transitions. The navigation system uses JavaScript for smooth page transitions without full page reloads, creating a single-page application experience.</p>
 
                     <h3>Technical Approach</h3>
-                    <p>The website uses vanilla JavaScript for navigation and interactions, avoiding unnecessary dependencies for better performance. CSS Grid and Flexbox are used for layouts, ensuring consistent rendering across browsers. The color scheme is carefully chosen to maintain good contrast and accessibility.</p>
+                    <p>The algorithm uses advanced image comparison techniques with OpenCV to analyze LPG tank features and identify discrepancies that indicate counterfeit products. The system compares tank characteristics including markings, serial numbers, manufacturing details, and physical features against a database of authentic tank specifications.</p>
 
-                    <h3>Performance Optimization</h3>
+                    <h3>Problem Statement</h3>
+                    <p>Counterfeit LPG tanks pose serious safety risks, as they may lack proper safety mechanisms and can lead to explosions or gas leaks. However, traditional detection methods were prohibitively expensive for many households. This project aimed to develop an affordable, accessible solution that could be widely deployed.</p>
+
+                    <h3>Cost Reduction Innovation</h3>
+                    <p>By leveraging computer vision and standard imaging equipment, the solution reduced costs by 80% compared to existing hardware-based authentication systems. This dramatic cost reduction was crucial for making the technology accessible to low-income families who are most vulnerable to purchasing counterfeit products.</p>
+
+                    <h3>Social Impact</h3>
+                    <p>This project directly contributes to public safety by preventing the distribution of dangerous counterfeit LPG tanks. By making detection technology affordable and accessible, it protects vulnerable communities from the risks associated with substandard gas containers. The patent ensures the technology can be commercialized and deployed at scale.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- EcoBuddies Project Detail -->
+    <div id="ecobuddies" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('home')">← Back to Home</a>
+            <section class="section">
+                <h2>EcoBuddies</h2>
+                <div class="project-detail">
+                    <p>EcoBuddies is an interactive full-stack chatbot application designed to promote environmental awareness and sustainable living. The project won Best Use of Streamlit at Caltech's premier hackathon, Hacktech 2025.</p>
+                    
+                    <h3>Award</h3>
+                    <p style="color: #ffd700; font-weight: 600;">🏆 Best Use of Streamlit - Hacktech 2025 (Caltech)</p>
+
+                    <h3>Project Overview</h3>
+                    <p>EcoBuddies integrates Google's Gemini LLM with Streamlit's web framework to create an engaging conversational interface that educates users about environmental topics, sustainability practices, and climate action. The application makes learning about environmentalism accessible and interactive through AI-powered conversations.</p>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">Python</span>
+                        <span class="tag">Streamlit</span>
+                        <span class="tag">Google Gemini API</span>
+                        <span class="tag">LLM Integration</span>
+                    </div>
+
+                    <h3>Key Features</h3>
                     <ul>
-                        <li>Optimized images with proper compression</li>
-                        <li>Minimal JavaScript for faster parsing</li>
-                        <li>CSS animations using GPU-accelerated properties</li>
-                        <li>Lazy loading for images</li>
+                        <li>Full-stack chatbot application with intuitive user interface</li>
+                        <li>Integration with Google Gemini LLM for intelligent conversations</li>
+                        <li>Real-time responses to environmental queries and sustainability questions</li>
+                        <li>Streamlit web framework for rapid development and deployment</li>
+                        <li>Educational content delivery through conversational AI</li>
                     </ul>
+
+                    <h3>Technical Implementation</h3>
+                    <p>The application leverages Streamlit's component-based architecture to create a responsive and interactive web interface. The Google Gemini API powers the conversational capabilities, providing accurate and contextually relevant responses to user queries about environmental topics.</p>
+
+                    <h3>Hackathon Success</h3>
+                    <p>Winning Best Use of Streamlit at Caltech's Hacktech 2025 demonstrated the application's effective use of modern web frameworks and AI technology. The judges recognized the project's clean implementation, user-friendly design, and impactful mission of promoting environmental awareness.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Rainforest Revival Project Detail -->
+    <div id="rainforest-revival" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('home')">← Back to Home</a>
+            <section class="section">
+                <h2>Rainforest Revival</h2>
+                <div class="project-detail">
+                    <p>Rainforest Revival is an innovative game that combines entertainment with environmental education. The project features three distinct mini-games and an integrated AI character chatbot, creating a unique gaming experience that raises awareness about rainforest conservation.</p>
+                    
+                    <h3>Award</h3>
+                    <p style="color: #ffd700; font-weight: 600;">🏆 Most Unique Game - SEO First Year Academy Summer Program</p>
+
+                    <h3>Project Overview</h3>
+                    <p>Developed during the SEO First Year Academy Summer Program, Rainforest Revival stands out for its creative combination of traditional game mechanics with cutting-edge AI technology. The game provides an engaging platform for learning about environmental conservation.</p>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">Python</span>
+                        <span class="tag">Pygame</span>
+                        <span class="tag">Google Gemini API</span>
+                        <span class="tag">Game Development</span>
+                    </div>
+
+                    <h3>Game Components</h3>
+                    <ul>
+                        <li><strong>Three Mini-Games:</strong> Each focuses on different aspects of rainforest ecosystems and conservation challenges</li>
+                        <li><strong>AI Character Chatbot:</strong> Integrated Google Gemini LLM provides an interactive guide that responds to player questions</li>
+                        <li><strong>Educational Content:</strong> Environmental information seamlessly woven into gameplay</li>
+                        <li><strong>Interactive Storytelling:</strong> Dynamic narrative that responds to player choices</li>
+                    </ul>
+
+                    <h3>Technical Implementation</h3>
+                    <p>Built using the Pygame framework for game mechanics and graphics, with Google Gemini API integration for the chatbot feature. The three mini-games were designed to be both entertaining and educational, each highlighting different conservation themes.</p>
+
+                    <h3>Why "Most Unique"</h3>
+                    <p>The project earned the Most Unique Game award for its innovative combination of traditional 2D gaming with advanced AI conversation capabilities. The seamless integration of an LLM-powered chatbot into a Pygame environment was particularly noteworthy.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Polygraph Project Detail -->
+    <div id="polygraph" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('home')">← Back to Home</a>
+            <section class="section">
+                <h2>Polygraph Lie Detection</h2>
+                <div class="project-detail">
+                    <p>A multimodal lie detection system that analyzes videos using both natural language processing and computer vision techniques. The system combines sentiment analysis from speech and visual cues to identify potential deception indicators.</p>
+                    
+                    <h3>Project Overview</h3>
+                    <p>This project explores the intersection of NLP and computer vision by implementing a comprehensive system that processes video content to detect deception through multimodal analysis.</p>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">Python</span>
+                        <span class="tag">NLP</span>
+                        <span class="tag">Computer Vision</span>
+                        <span class="tag">Google Cloud Speech API</span>
+                        <span class="tag">Sentiment Analysis</span>
+                    </div>
+
+                    <h3>System Components</h3>
+                    <ul>
+                        <li><strong>NLP Sentiment Analysis:</strong> Analyzes speech for linguistic patterns and emotional indicators</li>
+                        <li><strong>Computer Vision Analysis:</strong> Examines facial expressions and behavioral patterns</li>
+                        <li><strong>Speech-to-Text:</strong> Uses Google Cloud Speech API for transcription</li>
+                        <li><strong>Multimodal Integration:</strong> Combines NLP and CV insights for comprehensive assessment</li>
+                    </ul>
+
+                    <h3>Technical Implementation</h3>
+                    <p>The system processes videos by extracting audio and visual streams. Google Cloud Speech API converts speech to text for NLP sentiment analysis, while computer vision algorithms analyze facial expressions and behavioral cues simultaneously.</p>
+
+                    <h3>Multimodal Approach</h3>
+                    <p>By combining NLP sentiment analysis and computer vision, the system leverages multiple information sources. This approach provides more comprehensive detection than single-modality systems by analyzing both verbal and non-verbal communication.</p>
+
+                    <h3>Research Purpose</h3>
+                    <p>This project serves as an exploration of multimodal AI techniques. It's designed for educational and research purposes to understand the capabilities and challenges of combining NLP and computer vision for complex analysis tasks.</p>
                 </div>
             </section>
         </div>
@@ -626,7 +664,22 @@
         }
 
         function showProject(projectId) {
-            showPage(projectId);
+            // Hide all pages
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.remove('active'));
+            
+            // Show selected project page
+            const projectPage = document.getElementById(projectId);
+            if (projectPage) {
+                projectPage.classList.add('active');
+            }
+            
+            // Remove active state from nav links
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => link.classList.remove('active'));
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
         }
 
         // Add click handlers to nav links
