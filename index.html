@@ -40,8 +40,8 @@
         }
 
         .profile-image {
-            width: 150px;
-            height: 150px;
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
             border: 4px solid #ffd700;
             object-fit: cover;
@@ -51,7 +51,7 @@
             justify-content: center;
             font-size: 0.9rem;
             text-align: center;
-            padding: 1rem;
+            padding: 0.25rem;
             animation: fadeIn 1s ease-in;
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
         }
@@ -236,6 +236,10 @@
             background: rgba(255, 255, 255, 0.2);
             transform: scale(1.05);
         }
+        img.profile-image{
+            height: 17%;
+            width: 17%;
+        }
 
         @keyframes fadeIn {
             from {
@@ -267,17 +271,17 @@
 <body>
     <header>
         <div class="profile-section">
-            <img src="your-photo.jpg" alt="Your Name" class="profile-image">
+            <img class = "profile-image" src="profile.jpg" alt="Elsa Li" class="profile-image">
             <div>
-                <h1>Your Name</h1>
-                <p class="subtitle">Software Engineer | NLP & ML Enthusiast</p>
+                <h1>Elsa Li</h1>
+                <p class="subtitle">Undergraduate Computer Science and Math @ Harvey Mudd College</p>
             </div>
         </div>
     </header>
 
     <nav>
         <a class="nav-link active" data-page="home">Home</a>
-        <a class="nav-link" data-page="about">About</a>
+        <a class="nav-link" data-page="projects">Projects</a>
         <a class="nav-link" data-page="contact">Contact</a>
     </nav>
 
@@ -288,77 +292,6 @@
                 <h2>Welcome</h2>
                 <div class="about-content">
                     <p>Welcome to my portfolio! I'm a software engineer passionate about natural language processing, machine learning, and building impactful solutions. From developing RAG-based LLM systems for environmental research to creating award-winning applications, I love tackling challenging problems with innovative technology.</p>
-                </div>
-            </section>
-
-            <section class="section">
-                <h2>Projects</h2>
-                <div class="projects-grid">
-                    <div class="project-card" onclick="showProject('rag-system')">
-                        <h3>Agroforestry RAG System</h3>
-                        <p>RAG-based LLM system processing 2,000+ research papers, automating literature review for agroforestry queries.</p>
-                        <div class="tech-tags">
-                            <span class="tag">Python</span>
-                            <span class="tag">ChromaDB</span>
-                            <span class="tag">Qwen</span>
-                            <span class="tag">NLP</span>
-                        </div>
-                    </div>
-
-                    <div class="project-card" onclick="showProject('lpg-detection')">
-                        <h3>LPG Tank Fraud Detection</h3>
-                        <p>Patented computer vision algorithm with 70% accuracy for detecting fraudulent liquid petroleum gas tanks using OpenCV.</p>
-                        <div class="tech-tags">
-                            <span class="tag">Python</span>
-                            <span class="tag">OpenCV</span>
-                            <span class="tag">Computer Vision</span>
-                            <span class="tag">Patent</span>
-                        </div>
-                    </div>
-
-                    <div class="project-card" onclick="showProject('ecobuddies')">
-                        <h3>EcoBuddies</h3>
-                        <p>Award-winning interactive app promoting environmentalism. Won Best Use of Streamlit at Caltech's Hacktech 2025.</p>
-                        <div class="tech-tags">
-                            <span class="tag">Python</span>
-                            <span class="tag">Streamlit</span>
-                            <span class="tag">Gemini API</span>
-                        </div>
-                    </div>
-
-                    <div class="project-card" onclick="showProject('rainforest-revival')">
-                        <h3>Rainforest Revival</h3>
-                        <p>Award-winning game with 3 mini-games and AI chatbot integration. Won Most Unique Game at SEO First Year Academy.</p>
-                        <div class="tech-tags">
-                            <span class="tag">Python</span>
-                            <span class="tag">Pygame</span>
-                            <span class="tag">Gemini API</span>
-                        </div>
-                    </div>
-
-                    <div class="project-card" onclick="showProject('polygraph')">
-                        <h3>Polygraph Lie Detection</h3>
-                        <p>Multimodal lie detection system using NLP and computer vision sentiment analysis to identify deception in videos.</p>
-                        <div class="tech-tags">
-                            <span class="tag">Python</span>
-                            <span class="tag">NLP</span>
-                            <span class="tag">Computer Vision</span>
-                            <span class="tag">Google Cloud</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </div>
-
-    <!-- About Page -->
-    <div id="about" class="page">
-        <div class="container">
-            <section class="section">
-                <h2>About Me</h2>
-                <div class="about-content">
-                    <p>I'm a software engineer with experience in natural language processing, machine learning, and full-stack development. I'm passionate about leveraging AI and data-driven solutions to solve real-world problems.</p>
-                    <p>My work spans from building RAG-based LLM systems for environmental research to developing patented computer vision algorithms for safety applications. I've been fortunate to work with organizations like The Nature Conservancy, Yujun Venture Capital, and Shenzhen Lanyang Technology.</p>
                 </div>
             </section>
 
@@ -403,6 +336,81 @@
                     <p style="margin-top: 0.5rem;">Selected as 1 of 100 students from a highly competitive applicant pool | February 2025 - August 2025</p>
                 </div>
             </section>
+
+            
+        </div>
+    </div>
+
+    <!-- About Page -->
+    <div id="projects" class="page">
+        <div class="container">
+            <section class="section">
+                <h2>About Me</h2>
+                <div class="about-content">
+                    <p>I'm a software engineer with experience in natural language processing, machine learning, and full-stack development. I'm passionate about leveraging AI and data-driven solutions to solve real-world problems.</p>
+                    <p>My work spans from building RAG-based LLM systems for environmental research to developing patented computer vision algorithms for safety applications. I've been fortunate to work with organizations like The Nature Conservancy, Yujun Venture Capital, and Shenzhen Lanyang Technology.</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Projects</h2>
+                <div class="projects-grid">
+                    <div class="project-card" onclick="showProject('rag-system')">
+                        <h3>Agroforestry RAG System</h3>
+                        <p>RAG-based LLM system processing 2,000+ research papers, automating literature review for agroforestry queries.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">ChromaDB</span>
+                            <span class="tag">Qwen</span>
+                            <span class="tag">NLP</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('lpg-detection')">
+                        <h3>LPG Tank Fraud Detection</h3>
+                        <p>Patented computer vision algorithm with 70% accuracy for detecting fraudulent liquid petroleum gas tanks using OpenCV.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">OpenCV</span>
+                            <span class="tag">Computer Vision</span>
+                            <span class="tag">Patent</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('ecobuddies')">
+                        <h3>EcoBuddies</h3>
+                        <p> Won Best Use of Streamlit at Caltech's Hacktech 2025. Web app for setting daily environmental goals</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Streamlit</span>
+                            <span class="tag">Gemini API</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('rainforest-revival')">
+                        <h3>Rainforest Revival</h3>
+                        <p> Won Most Unique Game at SEO First Year Academy. Interactive game with 3 mini-games promoting environmental consciousness. </p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Pygame</span>
+                            <span class="tag">Gemini API</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('polygraph')">
+                        <h3>Polygraph Lie Detection</h3>
+                        <p>Multimodal lie detection system using NLP and computer vision sentiment analysis to identify deception in videos.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">NLP</span>
+                            <span class="tag">Computer Vision</span>
+                            <span class="tag">Google Cloud API</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            
         </div>
     </div>
 
@@ -626,11 +634,11 @@
             <section class="section">
                 <h2>Get In Touch</h2>
                 <div class="about-content">
-                    <p>I'm always open to new opportunities and collaborations. Feel free to reach out!</p>
+                    <p>I'm currently looking for software engineering internships for summer 2026, and I would love to get in contact to chat more!</p>
                     <div class="social-links">
-                        <a href="mailto:your.email@example.com">Email</a>
-                        <a href="#">GitHub</a>
-                        <a href="#">LinkedIn</a>
+                        <a href="mailto:elli@g.hmc.edu">Email</a>
+                        <a href= "https://github.com/elsali123" >GitHub</a>
+                        <a href="https://www.linkedin.com/in/elsa-li-hmc/">LinkedIn</a>
                     </div>
                 </div>
             </section>
@@ -638,7 +646,7 @@
     </div>
 
     <footer>
-        <p>&copy; 2025 Your Name. All rights reserved.</p>
+        <p>&copy; 2025 Elsa Li. All rights reserved.</p>
     </footer>
 
     <script>
