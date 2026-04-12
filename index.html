@@ -1117,6 +1117,43 @@
 
             document.addEventListener('mouseleave', function() { dot.style.opacity = '0'; });
             document.addEventListener('mouseenter', function() { dot.style.opacity = '1'; });
+
+            // Bridge cursor into the scheduler iframe (same-origin)
+            var schedulerIframe = document.getElementById('scheduler-iframe');
+            schedulerIframe.addEventListener('load', function() {
+                var iDoc = schedulerIframe.contentDocument || schedulerIframe.contentWindow.document;
+
+                // Suppress the default cursor inside the iframe
+                var s = iDoc.createElement('style');
+                s.textContent = '* { cursor: none !important; }';
+                iDoc.head.appendChild(s);
+
+                var hoverSel = 'a, button, [onclick], .project-card, input, textarea, select';
+
+                iDoc.addEventListener('mousemove', function(e) {
+                    var r = schedulerIframe.getBoundingClientRect();
+                    dot.style.left = (r.left + e.clientX) + 'px';
+                    dot.style.top  = (r.top  + e.clientY) + 'px';
+                    dot.style.opacity = '1';
+                }, { passive: true });
+
+                iDoc.addEventListener('mousedown', function(e) {
+                    dot.classList.add('clicking');
+                    dot.classList.remove('on-link');
+                    var r = schedulerIframe.getBoundingClientRect();
+                    spawnParticles(r.left + e.clientX, r.top + e.clientY);
+                });
+                iDoc.addEventListener('mouseup', function() { dot.classList.remove('clicking'); });
+
+                iDoc.addEventListener('mouseover', function(e) {
+                    if (e.target.closest(hoverSel)) dot.classList.add('on-link');
+                });
+                iDoc.addEventListener('mouseout', function(e) {
+                    if (e.target.closest(hoverSel)) dot.classList.remove('on-link');
+                });
+
+                iDoc.addEventListener('mouseleave', function() { dot.style.opacity = '0'; });
+            });
         })();
 
         // ── Particles on click ──
