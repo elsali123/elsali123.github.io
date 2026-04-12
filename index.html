@@ -95,6 +95,92 @@
             background: rgba(255, 255, 255, 0.25);
         }
 
+        /* ── Scheduler password overlay ── */
+        .pw-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            gap: 1.2rem;
+        }
+
+        .pw-box {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 2.5rem 2rem;
+            text-align: center;
+            width: 100%;
+            max-width: 360px;
+        }
+
+        .pw-box h2 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+            color: #ffd700;
+            border: none;
+            padding: 0;
+        }
+
+        .pw-box p {
+            opacity: 0.75;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .pw-box input[type="password"] {
+            width: 100%;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            border: 1.5px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            margin-bottom: 0.8rem;
+            transition: border-color 0.2s;
+        }
+
+        .pw-box input[type="password"]:focus {
+            border-color: #ffd700;
+        }
+
+        .pw-box button {
+            width: 100%;
+            padding: 0.65rem;
+            border: none;
+            border-radius: 8px;
+            background: #ffd700;
+            color: #201b5e;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .pw-box button:hover { opacity: 0.88; }
+
+        .pw-error {
+            color: #ff6b6b;
+            font-size: 0.85rem;
+            min-height: 1.1rem;
+            margin-top: 0.4rem;
+        }
+
+        /* ── Scheduler iframe container ── */
+        #scheduler-frame-wrap {
+            display: none;
+            width: 100%;
+            height: calc(100vh - 140px);
+        }
+
+        #scheduler-frame-wrap iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -283,6 +369,7 @@
         <a class="nav-link active" data-page="home">Home</a>
         <a class="nav-link" data-page="projects">Projects</a>
         <a class="nav-link" data-page="contact">Contact</a>
+        <a class="nav-link" data-page="scheduler">Scheduler</a>
     </nav>
 
     <!-- Home Page -->
@@ -659,11 +746,53 @@
         </div>
     </div>
 
+    <!-- Scheduler Page -->
+    <div id="scheduler" class="page">
+        <div class="pw-overlay" id="scheduler-pw-overlay">
+            <div class="pw-box">
+                <h2>🌸 Scheduler</h2>
+                <p>This page is password protected.</p>
+                <input type="password" id="scheduler-pw-input" placeholder="Enter password" />
+                <div class="pw-error" id="scheduler-pw-error"></div>
+                <button onclick="checkSchedulerPassword()">Unlock</button>
+            </div>
+        </div>
+        <div id="scheduler-frame-wrap">
+            <iframe src="scheduler.html" id="scheduler-iframe"></iframe>
+        </div>
+    </div>
+
     <footer>
         <p>&copy; 2025 Elsa Li. All rights reserved.</p>
     </footer>
 
     <script>
+        var schedulerUnlocked = false;
+
+        function checkSchedulerPassword() {
+            var input = document.getElementById('scheduler-pw-input').value;
+            var errorEl = document.getElementById('scheduler-pw-error');
+            if (input === 'elsali') {
+                schedulerUnlocked = true;
+                document.getElementById('scheduler-pw-overlay').style.display = 'none';
+                document.getElementById('scheduler-frame-wrap').style.display = 'block';
+                errorEl.textContent = '';
+            } else {
+                errorEl.textContent = 'Incorrect password. Try again.';
+                var box = document.querySelector('.pw-box');
+                box.style.animation = 'shake 0.4s ease';
+                setTimeout(function() { box.style.animation = ''; }, 400);
+                document.getElementById('scheduler-pw-input').value = '';
+            }
+        }
+
+        // Allow Enter key on password field
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('scheduler-pw-input').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') checkSchedulerPassword();
+            });
+        });
+
         function showPage(pageId) {
             // Hide all pages
             const pages = document.querySelectorAll('.page');
