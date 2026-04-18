@@ -659,6 +659,7 @@
 </head>
 <body>
     <div id="cursor-dot"></div>
+    <canvas id="flower-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:3;"></canvas>
     <nav id="site-nav">
         <div class="nav-identity">
             <img class="nav-avatar" src="profile.jpg" alt="Elsa Li">
@@ -1089,6 +1090,8 @@
             document.addEventListener('mousemove', function(e) {
                 mouseX = e.clientX;
                 mouseY = e.clientY;
+                window._flMX = mouseX;
+                window._flMY = mouseY;
                 dot.style.left = mouseX + 'px';
                 dot.style.top  = mouseY + 'px';
             }, { passive: true });
@@ -1132,6 +1135,8 @@
 
                 iDoc.addEventListener('mousemove', function(e) {
                     var r = schedulerIframe.getBoundingClientRect();
+                    window._flMX = r.left + e.clientX;
+                    window._flMY = r.top  + e.clientY;
                     dot.style.left = (r.left + e.clientX) + 'px';
                     dot.style.top  = (r.top  + e.clientY) + 'px';
                     dot.style.opacity = '1';
@@ -1274,6 +1279,196 @@
                 showPage(this.getAttribute('data-page'));
             });
         });
+    </script>
+
+    <script>
+        // ── Falling Camellia Flowers ──
+        (function() {
+            var canvas = document.getElementById('flower-canvas');
+            var ctx = canvas.getContext('2d');
+            var W, H;
+
+            function resize() {
+                W = canvas.width  = window.innerWidth;
+                H = canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resize, { passive: true });
+            resize();
+
+            // Shared mouse position (also written by cursor IIFE + iframe bridge)
+            window._flMX = -300;
+            window._flMY = -300;
+
+            // Scroll boost
+            var scrollBoost = 0;
+            var lastSY = window.scrollY;
+            window.addEventListener('scroll', function() {
+                var dy = window.scrollY - lastSY;
+                scrollBoost += dy * 0.06;
+                lastSY = window.scrollY;
+            }, { passive: true });
+
+            // ── SVG camellia generator ──
+            function petal(rx, ry) {
+                return 'M 0,0 C ' +
+                    (-rx)        + ',' + (-(ry * 0.3))  + ' ' +
+                    (-(rx*0.85)) + ',' + (-(ry * 0.93)) + ' 0,' + (-ry) +
+                    ' C ' +
+                    (rx*0.85)    + ',' + (-(ry * 0.93)) + ' ' +
+                    rx           + ',' + (-(ry * 0.3))  + ' 0,0 Z';
+            }
+
+            function makeSVG(fill, stroke, fo) {
+                var isFillNone = fill === 'none';
+                function fAttr(alpha) {
+                    return isFillNone ? 'fill="none"'
+                        : 'fill="' + fill + '" fill-opacity="' + Math.min(1, alpha) + '"';
+                }
+                var parts = '';
+                // Outer ring: 8 petals
+                for (var i = 0; i < 8; i++)
+                    parts += '<path d="' + petal(12, 36) + '" transform="rotate(' + (i*45) + ')" ' +
+                             fAttr(fo) + ' stroke="' + stroke + '" stroke-width="1.7" stroke-linejoin="round"/>';
+                // Middle ring: 7 petals, offset
+                for (var i = 0; i < 7; i++)
+                    parts += '<path d="' + petal(8.5, 25) + '" transform="rotate(' + (i*(360/7)+25.7).toFixed(1) + ')" ' +
+                             fAttr(fo + 0.05) + ' stroke="' + stroke + '" stroke-width="1.4" stroke-linejoin="round"/>';
+                // Inner ring: 6 petals
+                for (var i = 0; i < 6; i++)
+                    parts += '<path d="' + petal(5.5, 15) + '" transform="rotate(' + (i*60+10) + ')" ' +
+                             fAttr(fo + 0.1) + ' stroke="' + stroke + '" stroke-width="1.2" stroke-linejoin="round"/>';
+                // Center
+                var cf  = isFillNone ? stroke : fill;
+                var cfo = isFillNone ? 0.25 : fo;
+                parts += '<circle r="7" fill="' + cf + '" fill-opacity="' + cfo + '" stroke="' + stroke + '" stroke-width="1.5"/>';
+                parts += '<circle r="3.5" fill="' + stroke + '" opacity="0.9"/>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-54 -54 108 108"><g opacity="0.93">' + parts + '</g></svg>';
+            }
+
+            var CONFIGS = [
+                { fill: '#f48fb1', stroke: '#c2185b', fo: 0.82 },  // hot pink filled
+                { fill: 'none',    stroke: '#9575cd', fo: 1    },  // lavender outline
+                { fill: '#fce4ec', stroke: '#f48fb1', fo: 0.78 },  // blush filled
+                { fill: '#e1bee7', stroke: '#9575cd', fo: 0.80 },  // lavender filled
+                { fill: 'none',    stroke: '#c2185b', fo: 1    },  // hot pink outline
+                { fill: '#f8bbd0', stroke: '#ad1457', fo: 0.72 },  // soft pink filled
+                { fill: '#bbdefb', stroke: '#1565c0', fo: 0.78 },  // pastel blue filled
+                { fill: 'none',    stroke: '#90caf9', fo: 1    },  // pastel blue outline
+                { fill: '#e3f2fd', stroke: '#90caf9', fo: 0.75 },  // ice blue filled
+            ];
+
+            var imgs = [];
+
+            function loadImgs(cb) {
+                var loaded = 0;
+                CONFIGS.forEach(function(cfg) {
+                    var img = new Image();
+                    img.onload = function() { if (++loaded === CONFIGS.length) cb(); };
+                    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(makeSVG(cfg.fill, cfg.stroke, cfg.fo));
+                    imgs.push(img);
+                });
+            }
+
+            // ── Flower particle ──
+            function Flower(scatterY) {
+                this.img     = imgs[Math.floor(Math.random() * imgs.length)];
+                this.size    = 68 + Math.random() * 82;
+                this.x       = Math.random() * (W + 80) - 40;
+                this.y       = scatterY !== undefined ? scatterY : -this.size;
+                this.baseVx  = (Math.random() - 0.5) * 0.55;
+                this.baseVy  = 0.32 + Math.random() * 0.58;
+                this.vx      = this.baseVx;
+                this.vy      = this.baseVy;
+                this.rot     = Math.random() * Math.PI * 2;
+                this.rotSpd   = (Math.random() - 0.5) * 0.007;
+                this.rotBoost = 0;
+                this.curlDir  = Math.random() < 0.5 ? 1 : -1;
+                this.opacity  = 0.55 + Math.random() * 0.35;
+                this.wp      = Math.random() * Math.PI * 2;   // wobble phase
+                this.ws      = 0.008 + Math.random() * 0.009; // wobble speed
+                this.wa      = 0.22 + Math.random() * 0.32;   // wobble amplitude
+            }
+
+            Flower.prototype.update = function() {
+                // Sinusoidal horizontal wobble
+                this.wp += this.ws;
+                var wobble = Math.sin(this.wp) * this.wa;
+
+                // Mouse curl — radial nudge + tangential swirl + spin boost
+                var dx = this.x - window._flMX;
+                var dy = this.y - window._flMY;
+                var d  = Math.sqrt(dx*dx + dy*dy);
+                var rx = 0, ry = 0;
+                this.rotBoost *= 0.90; // spin boost decays ~30 frames
+                if (d < 145 && d > 1) {
+                    var f = ((145 - d) / 145) * 2.6;
+                    // Radial push (away from cursor)
+                    rx += (dx / d) * f * 0.55;
+                    ry += (dy / d) * f * 0.40;
+                    // Tangential curl (perpendicular — makes it sweep sideways)
+                    rx += (-dy / d) * f * this.curlDir * 0.90;
+                    ry += ( dx / d) * f * this.curlDir * 0.90;
+                    // Spin boost so the petal visually rotates as it curls
+                    this.rotBoost += this.curlDir * f * 0.045;
+                }
+
+                // Smoothly return to base velocity (spring damping)
+                this.vx += (this.baseVx + wobble - this.vx) * 0.028;
+                this.vy += (this.baseVy           - this.vy) * 0.028;
+
+                // Apply
+                this.x  += this.vx + rx;
+                this.y  += this.vy + ry + Math.min(scrollBoost, 7);
+                this.rot += this.rotSpd + this.rotBoost;
+            };
+
+            Flower.prototype.draw = function() {
+                if (!this.img.complete) return;
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rot);
+                ctx.drawImage(this.img, -this.size/2, -this.size/2, this.size, this.size);
+                ctx.restore();
+            };
+
+            Flower.prototype.dead = function() {
+                return this.y > H + this.size || this.x < -this.size*3 || this.x > W + this.size*3;
+            };
+
+            var flowers  = [];
+            var spawnT   = 0;
+            var SPAWN_IV = 100;  // frames between spawns (~1.7 s at 60 fps)
+            var MAX      = 11;
+
+            function tick() {
+                ctx.clearRect(0, 0, W, H);
+                scrollBoost *= 0.87;
+
+                spawnT++;
+                if (spawnT >= SPAWN_IV && flowers.length < MAX) {
+                    flowers.push(new Flower());
+                    spawnT = 0;
+                }
+
+                for (var i = flowers.length - 1; i >= 0; i--) {
+                    if (flowers[i].dead()) { flowers.splice(i, 1); continue; }
+                    flowers[i].update();
+                    flowers[i].draw();
+                }
+                requestAnimationFrame(tick);
+            }
+
+            window.addEventListener('load', function() {
+                loadImgs(function() {
+                    // Seed flowers scattered across the viewport so it looks full immediately
+                    for (var i = 0; i < 7; i++) {
+                        flowers.push(new Flower(Math.random() * H));
+                    }
+                    tick();
+                });
+            });
+        })();
     </script>
 </body>
 </html>
