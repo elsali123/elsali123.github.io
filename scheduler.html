@@ -1738,11 +1738,15 @@ function fbInit() {
       fbSetStatus('saving', 'Loading…');
 
       try {
-        const { data, error } = await sbClient
+        const loadQuery = sbClient
           .from('tasks')
           .select('data')
           .eq('user_id', sbUser.id)
-          .single();
+          .maybeSingle();
+        const timeout = new Promise((_, rej) =>
+          setTimeout(() => rej(new Error('Load timed out')), 10000));
+        const { data, error } = await Promise.race([loadQuery, timeout]);
+        if (error) throw error;
 
         if (data?.data) {
           tasks = data.data;
