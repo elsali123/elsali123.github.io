@@ -1750,7 +1750,7 @@ function fbInit() {
           showToast('Tasks loaded from cloud ☁️');
         } else {
           // First sign-in — push existing tasks up
-          await sbClient.from('tasks').upsert({ user_id: sbUser.id, data: tasks, updated_at: new Date().toISOString() });
+          await sbClient.from('tasks').upsert({ user_id: sbUser.id, data: tasks, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
         }
         fbSetStatus('live', 'Synced');
       } catch (e) {
@@ -1770,13 +1770,32 @@ function fbSignIn() {
   sbClient.auth.signInWithOAuth({                           
     provider: 'google',
     options: { redirectTo: window.location.href }
-  })  
+  })
     .catch(e => showToast('Sign-in failed: ' + e.message));
 }
 
 function fbSignOut() {
-  if (!sbClient) return;
-  sbClient.auth.signOut().then(() => showToast('Signed out of cloud sync'));
+  // Reset UI and local state immediately — don't wait for the Supabase call,
+  // which can hang under lock contention.
+  sbUser = null;
+  try {
+    document.getElementById('sync-signed-out').style.display = 'block';
+    document.getElementById('sync-signed-in').style.display  = 'none';
+    fbSetStatus('', 'Not connected');
+  } catch (_) {}
+  // Clear cached auth tokens so we don't auto-sign-back-in on reload
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-') && k.includes('-auth-token'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+  showToast('Signed out of cloud sync');
+  // Best-effort supabase signOut (non-blocking)
+  if (sbClient) {
+    try {
+      sbClient.auth.signOut().catch(e => console.warn('Supabase signOut error:', e));
+    } catch (e) { console.warn('Supabase signOut threw:', e); }
+  }
 }
 
 // Debounced write — batches rapid changes into a single Supabase write
@@ -1786,7 +1805,7 @@ function fbSave() {
   clearTimeout(sbSyncTimer);
   sbSyncTimer = setTimeout(async () => {
     try {
-      const { error } = await sbClient.from('tasks').upsert({ user_id: sbUser.id, data: tasks, updated_at: new Date().toISOString() });
+      const { error } = await sbClient.from('tasks').upsert({ user_id: sbUser.id, data: tasks, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
       if (error) throw error;
       fbSetStatus('live', 'Synced');
     } catch (e) {

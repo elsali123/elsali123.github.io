@@ -1247,15 +1247,21 @@
         })();
 
         // ── Scheduler password ──
-        var schedulerUnlocked = false;
+        var SCHEDULER_UNLOCK_KEY = 'schedulerUnlocked';
+        var schedulerUnlocked = localStorage.getItem(SCHEDULER_UNLOCK_KEY) === '1';
+
+        function unlockScheduler() {
+            schedulerUnlocked = true;
+            localStorage.setItem(SCHEDULER_UNLOCK_KEY, '1');
+            document.getElementById('scheduler-pw-overlay').style.display = 'none';
+            document.getElementById('scheduler-frame-wrap').style.display = 'block';
+        }
 
         function checkSchedulerPassword() {
             var input    = document.getElementById('scheduler-pw-input').value;
             var errorEl  = document.getElementById('scheduler-pw-error');
             if (input === 'elsali') {
-                schedulerUnlocked = true;
-                document.getElementById('scheduler-pw-overlay').style.display = 'none';
-                document.getElementById('scheduler-frame-wrap').style.display = 'block';
+                unlockScheduler();
                 errorEl.textContent = '';
             } else {
                 errorEl.textContent = 'Incorrect password. Try again.';
@@ -1270,6 +1276,7 @@
             document.getElementById('scheduler-pw-input').addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') checkSchedulerPassword();
             });
+            if (schedulerUnlocked) unlockScheduler();
         });
 
         // ── Page navigation ──
