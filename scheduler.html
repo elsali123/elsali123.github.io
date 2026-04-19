@@ -1767,7 +1767,10 @@ function fbInit() {
 
 function fbSignIn() {
   if (!sbClient) { showToast('Supabase not configured yet 🔑'); return; }
-  sbClient.auth.signInWithOAuth({ provider: 'google' })
+  sbClient.auth.signInWithOAuth({                           
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  })  
     .catch(e => showToast('Sign-in failed: ' + e.message));
 }
 
