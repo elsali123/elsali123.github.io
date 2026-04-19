@@ -157,6 +157,44 @@
             box-shadow: 0 2px 20px rgba(180, 120, 160, 0.1);
         }
 
+        /* Left-side nav cluster: flower toggle + mini identity */
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            min-width: 0;
+        }
+
+        /* Flower-toggle button — always visible, top-left */
+        .flower-toggle {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(244, 143, 177, 0.45);
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 0;
+            transition: all 0.22s ease;
+            box-shadow: 0 2px 8px rgba(180, 120, 160, 0.12);
+            flex-shrink: 0;
+        }
+        .flower-toggle:hover {
+            background: rgba(255, 255, 255, 0.95);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(244, 143, 177, 0.3);
+        }
+        .flower-toggle.off {
+            opacity: 0.55;
+            filter: grayscale(0.85);
+        }
+
         /* Mini identity — hidden until scrolled */
         .nav-identity {
             display: flex;
@@ -661,9 +699,12 @@
     <div id="cursor-dot"></div>
     <canvas id="flower-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:3;"></canvas>
     <nav id="site-nav">
-        <div class="nav-identity">
-            <img class="nav-avatar" src="profile.jpg" alt="Elsa Li">
-            <span class="nav-name">Elsa Li</span>
+        <div class="nav-left">
+            <button id="flower-toggle" class="flower-toggle" type="button" aria-label="Toggle falling flowers" title="Toggle falling flowers">🌸</button>
+            <div class="nav-identity">
+                <img class="nav-avatar" src="profile.jpg" alt="Elsa Li">
+                <span class="nav-name">Elsa Li</span>
+            </div>
         </div>
         <div class="nav-links">
             <a class="nav-link active" data-page="home">Home</a>
@@ -1309,13 +1350,44 @@
             }, { passive: true });
 
             // ── SVG camellia generator ──
-            function petal(rx, ry) {
-                return 'M 0,0 C ' +
-                    (-rx)        + ',' + (-(ry * 0.3))  + ' ' +
-                    (-(rx*0.85)) + ',' + (-(ry * 0.93)) + ' 0,' + (-ry) +
-                    ' C ' +
-                    (rx*0.85)    + ',' + (-(ry * 0.93)) + ' ' +
-                    rx           + ',' + (-(ry * 0.3))  + ' 0,0 Z';
+            // Curled-outward petal: wide cupped shape with flared, slightly notched tip
+            // (outer petals of a camellia that peel back — paper-cut look)
+            function petalCurled(rx, ry) {
+                return 'M 0,0 ' +
+                    // left side sweeps out wide (curling away from center)
+                    'C ' + (-rx*1.15) + ',' + (-(ry*0.10)) + ' ' +
+                           (-rx*1.25) + ',' + (-(ry*0.55)) + ' ' +
+                           (-rx*0.90) + ',' + (-(ry*0.90)) + ' ' +
+                    // top-left lobe (flared)
+                    'C ' + (-rx*0.65) + ',' + (-(ry*1.08)) + ' ' +
+                           (-rx*0.22) + ',' + (-(ry*1.05)) + ' ' +
+                           (-rx*0.08) + ',' + (-(ry*0.92)) + ' ' +
+                    // small notch/dip at the tip (gives the paper-ruffle look)
+                    'C ' + (-rx*0.02) + ',' + (-(ry*0.86)) + ' ' +
+                           ( rx*0.02) + ',' + (-(ry*0.86)) + ' ' +
+                           ( rx*0.08) + ',' + (-(ry*0.92)) + ' ' +
+                    // top-right lobe
+                    'C ' + ( rx*0.22) + ',' + (-(ry*1.05)) + ' ' +
+                           ( rx*0.65) + ',' + (-(ry*1.08)) + ' ' +
+                           ( rx*0.90) + ',' + (-(ry*0.90)) + ' ' +
+                    // right side sweeps back to base
+                    'C ' + ( rx*1.25) + ',' + (-(ry*0.55)) + ' ' +
+                           ( rx*1.15) + ',' + (-(ry*0.10)) + ' 0,0 Z';
+            }
+
+            // Closed petal: narrower almond for inner rings (tucked in)
+            function petalClosed(rx, ry) {
+                return 'M 0,0 ' +
+                    'C ' + (-rx*0.95) + ',' + (-(ry*0.25)) + ' ' +
+                           (-rx*0.75) + ',' + (-(ry*0.90)) + ' 0,' + (-ry) + ' ' +
+                    'C ' + ( rx*0.75) + ',' + (-(ry*0.90)) + ' ' +
+                           ( rx*0.95) + ',' + (-(ry*0.25)) + ' 0,0 Z';
+            }
+
+            // Crease/fold line down the middle of a curled petal — paper vein effect
+            function petalCrease(ry, stroke) {
+                return '<path d="M 0,' + (-ry*0.05) + ' Q ' + (ry*0.03) + ',' + (-ry*0.5) + ' 0,' + (-ry*0.88) +
+                       '" fill="none" stroke="' + stroke + '" stroke-width="0.8" stroke-opacity="0.55" stroke-linecap="round"/>';
             }
 
             function makeSVG(fill, stroke, fo) {
@@ -1325,36 +1397,53 @@
                         : 'fill="' + fill + '" fill-opacity="' + Math.min(1, alpha) + '"';
                 }
                 var parts = '';
-                // Outer ring: 8 petals
-                for (var i = 0; i < 8; i++)
-                    parts += '<path d="' + petal(12, 36) + '" transform="rotate(' + (i*45) + ')" ' +
-                             fAttr(fo) + ' stroke="' + stroke + '" stroke-width="1.7" stroke-linejoin="round"/>';
-                // Middle ring: 7 petals, offset
+                // Outer ring: 9 curled/flared petals — paper-cupping outward
+                for (var i = 0; i < 9; i++) {
+                    var rot = i * 40;
+                    parts += '<g transform="rotate(' + rot + ')">' +
+                             '<path d="' + petalCurled(17, 36) + '" ' +
+                             fAttr(fo) + ' stroke="' + stroke + '" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round"/>' +
+                             petalCrease(36, stroke) +
+                             '</g>';
+                }
+                // Second ring: 8 curled petals, slightly smaller, offset
+                for (var i = 0; i < 8; i++) {
+                    var rot = i * 45 + 22;
+                    parts += '<g transform="rotate(' + rot + ')">' +
+                             '<path d="' + petalCurled(13, 26) + '" ' +
+                             fAttr(fo + 0.04) + ' stroke="' + stroke + '" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>' +
+                             petalCrease(26, stroke) +
+                             '</g>';
+                }
+                // Third ring: 7 closed petals (tucked inward)
                 for (var i = 0; i < 7; i++)
-                    parts += '<path d="' + petal(8.5, 25) + '" transform="rotate(' + (i*(360/7)+25.7).toFixed(1) + ')" ' +
-                             fAttr(fo + 0.05) + ' stroke="' + stroke + '" stroke-width="1.4" stroke-linejoin="round"/>';
-                // Inner ring: 6 petals
-                for (var i = 0; i < 6; i++)
-                    parts += '<path d="' + petal(5.5, 15) + '" transform="rotate(' + (i*60+10) + ')" ' +
-                             fAttr(fo + 0.1) + ' stroke="' + stroke + '" stroke-width="1.2" stroke-linejoin="round"/>';
+                    parts += '<path d="' + petalClosed(8.5, 18) + '" transform="rotate(' + (i*(360/7) + 12).toFixed(1) + ')" ' +
+                             fAttr(fo + 0.08) + ' stroke="' + stroke + '" stroke-width="1.5" stroke-linejoin="round"/>';
+                // Inner ring: 5 tight closed petals
+                for (var i = 0; i < 5; i++)
+                    parts += '<path d="' + petalClosed(5.5, 11) + '" transform="rotate(' + (i*72 + 36) + ')" ' +
+                             fAttr(fo + 0.14) + ' stroke="' + stroke + '" stroke-width="1.3" stroke-linejoin="round"/>';
                 // Center
                 var cf  = isFillNone ? stroke : fill;
-                var cfo = isFillNone ? 0.25 : fo;
-                parts += '<circle r="7" fill="' + cf + '" fill-opacity="' + cfo + '" stroke="' + stroke + '" stroke-width="1.5"/>';
-                parts += '<circle r="3.5" fill="' + stroke + '" opacity="0.9"/>';
-                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-54 -54 108 108"><g opacity="0.93">' + parts + '</g></svg>';
+                var cfo = isFillNone ? 0.30 : fo;
+                parts += '<circle r="4.5" fill="' + cf + '" fill-opacity="' + cfo + '" stroke="' + stroke + '" stroke-width="1.4"/>';
+                parts += '<circle r="1.8" fill="' + stroke + '" opacity="0.9"/>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-58 -58 116 116"><g opacity="0.95">' + parts + '</g></svg>';
             }
 
             var CONFIGS = [
-                { fill: '#f48fb1', stroke: '#c2185b', fo: 0.82 },  // hot pink filled
                 { fill: 'none',    stroke: '#9575cd', fo: 1    },  // lavender outline
-                { fill: '#fce4ec', stroke: '#f48fb1', fo: 0.78 },  // blush filled
-                { fill: '#e1bee7', stroke: '#9575cd', fo: 0.80 },  // lavender filled
-                { fill: 'none',    stroke: '#c2185b', fo: 1    },  // hot pink outline
-                { fill: '#f8bbd0', stroke: '#ad1457', fo: 0.72 },  // soft pink filled
-                { fill: '#bbdefb', stroke: '#1565c0', fo: 0.78 },  // pastel blue filled
+                { fill: '#fce4ec', stroke: '#f48fb1', fo: 0.82 },  // blush filled
+                { fill: '#e1bee7', stroke: '#9575cd', fo: 0.82 },  // lavender filled
+                { fill: '#f8bbd0', stroke: '#ec407a', fo: 0.76 },  // soft pink filled
+                { fill: 'none',    stroke: '#f48fb1', fo: 1    },  // soft pink outline
+                { fill: '#fdf6f9', stroke: '#f48fb1', fo: 0.85 },  // cream/white filled
+                { fill: '#fffaf0', stroke: '#e0c9a8', fo: 0.75 },  // light cream filled
+                // { fill: '#ce93d8', stroke: '#7b1fa2', fo: 0.80 },  // purple filled
+                // { fill: 'none',    stroke: '#ba68c8', fo: 1    },  // purple outline
+                { fill: '#bbdefb', stroke: '#64b5f6', fo: 0.80 },  // pastel blue filled
+                { fill: '#e3f2fd', stroke: '#90caf9', fo: 0.78 },  // ice blue filled
                 { fill: 'none',    stroke: '#90caf9', fo: 1    },  // pastel blue outline
-                { fill: '#e3f2fd', stroke: '#90caf9', fo: 0.75 },  // ice blue filled
             ];
 
             var imgs = [];
@@ -1438,11 +1527,14 @@
 
             var flowers  = [];
             var spawnT   = 0;
-            var SPAWN_IV = 100;  // frames between spawns (~1.7 s at 60 fps)
-            var MAX      = 11;
+            var SPAWN_IV = 70;   // frames between spawns (~1.2 s at 60 fps)
+            var MAX      = 16;
+
+            var enabled = true;
 
             function tick() {
                 ctx.clearRect(0, 0, W, H);
+                if (!enabled) { requestAnimationFrame(tick); return; }
                 scrollBoost *= 0.87;
 
                 spawnT++;
@@ -1459,6 +1551,21 @@
                 requestAnimationFrame(tick);
             }
 
+            window.flowerFX = {
+                isEnabled: function() { return enabled; },
+                set: function(on) {
+                    enabled = !!on;
+                    if (!enabled) {
+                        flowers.length = 0;
+                        ctx.clearRect(0, 0, W, H);
+                    } else if (imgs.length && imgs[0].complete) {
+                        // Reseed only when images are ready (avoids undefined .img on early init)
+                        for (var i = 0; i < 7; i++) flowers.push(new Flower(Math.random() * H));
+                    }
+                },
+                toggle: function() { this.set(!enabled); return enabled; }
+            };
+
             window.addEventListener('load', function() {
                 loadImgs(function() {
                     // Seed flowers scattered across the viewport so it looks full immediately
@@ -1467,6 +1574,35 @@
                     }
                     tick();
                 });
+            });
+        })();
+
+        // ── Flower toggle button ──
+        (function() {
+            var btn = document.getElementById('flower-toggle');
+            if (!btn) return;
+            var STORAGE_KEY = 'flowersEnabled';
+            var stored = localStorage.getItem(STORAGE_KEY);
+            var initial = stored === null ? true : stored === '1';
+
+            function apply(on) {
+                if (window.flowerFX) window.flowerFX.set(on);
+                btn.classList.toggle('off', !on);
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                btn.title = on ? 'Turn off falling flowers' : 'Turn on falling flowers';
+                localStorage.setItem(STORAGE_KEY, on ? '1' : '0');
+            }
+
+            // Defer initial apply until flowerFX exists (IIFE above is sync, but be safe)
+            function init() {
+                if (!window.flowerFX) { requestAnimationFrame(init); return; }
+                apply(initial);
+            }
+            init();
+
+            btn.addEventListener('click', function() {
+                var on = !(window.flowerFX && window.flowerFX.isEnabled());
+                apply(on);
             });
         })();
     </script>
