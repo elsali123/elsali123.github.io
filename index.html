@@ -1308,7 +1308,28 @@
                     document.getElementById('site-nav').classList.remove('scrolled');
                 }
             }
+            // Persist current page in URL hash so refresh keeps you here
+            var newHash = pageId === 'home' ? '' : '#' + pageId;
+            if (location.hash !== newHash) {
+                history.replaceState(null, '', location.pathname + location.search + newHash);
+            }
         }
+
+        // Restore page from URL hash on load
+        (function() {
+            function restoreFromHash() {
+                var id = (location.hash || '').replace(/^#/, '');
+                if (id && document.getElementById(id) && document.getElementById(id).classList.contains('page')) {
+                    showPage(id);
+                }
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', restoreFromHash);
+            } else {
+                restoreFromHash();
+            }
+            window.addEventListener('hashchange', restoreFromHash);
+        })();
 
         function showProject(projectId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
