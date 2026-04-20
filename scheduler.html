@@ -369,12 +369,18 @@
     .cal-mini-dot{width:4px;height:4px;border-radius:50%;background:var(--lav-deep);position:absolute;bottom:1px;left:50%;transform:translateX(-50%)}
 
     /* ── Weekly grid — Google Calendar style ── */
-    .cal-right{display:flex;flex-direction:column;gap:0}
-    .cal-grid-wrap{overflow-x:auto;overflow-y:auto;max-height:65vh;border-radius:0 0 14px 14px}
-    .cal-grid{display:grid;grid-template-columns:56px repeat(7,1fr);min-width:560px;border:1px solid rgba(200,180,220,.25);border-bottom:none;border-radius:14px 14px 0 0;overflow:hidden;background:rgba(255,255,255,.55)}
+    /* min-width:0 lets this grid item shrink to its parent column; without it
+       the inner content can push the whole card past the viewport. */
+    .cal-right{display:flex;flex-direction:column;gap:0;min-width:0}
+    /* Single horizontal scroll track for allday + workload + grid + footer so
+       they all scroll in lockstep. */
+    .cal-hscroll{overflow-x:auto;max-width:100%;border-radius:14px}
+    .cal-hscroll-inner{min-width:960px;display:flex;flex-direction:column}
+    .cal-grid-wrap{overflow-x:visible;overflow-y:auto;max-height:65vh;border-radius:0 0 14px 14px}
+    .cal-grid{display:grid;grid-template-columns:56px repeat(7,1fr);width:100%;border:1px solid rgba(200,180,220,.25);border-bottom:none;border-radius:14px 14px 0 0;overflow:hidden;background:rgba(255,255,255,.55)}
 
     /* ── Allday strip ── */
-    .cal-allday-wrap{min-width:560px;border:1px solid rgba(200,180,220,.25);border-top:none;border-bottom:1px solid rgba(200,180,220,.2);display:grid;grid-template-columns:56px repeat(7,1fr);background:rgba(255,255,255,.62)}
+    .cal-allday-wrap{width:100%;border:1px solid rgba(200,180,220,.25);border-top:none;border-bottom:1px solid rgba(200,180,220,.2);display:grid;grid-template-columns:56px repeat(7,1fr);background:rgba(255,255,255,.62)}
     .cal-allday-gutter{border-right:1px solid rgba(200,180,220,.2);padding:4px 5px 4px 0;display:flex;align-items:flex-start;justify-content:flex-end}
     .cal-allday-label{font-size:.58rem;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;line-height:1.4;text-align:right}
     .cal-allday-col{border-right:1px solid rgba(200,180,220,.12);padding:4px 3px;min-height:28px;display:flex;flex-direction:column;gap:2px}
@@ -383,7 +389,7 @@
     .cal-due-chip{border-radius:4px;padding:1px 5px;font-size:.64rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 
     /* ── Workload bars ── */
-    .cal-workload-wrap{min-width:560px;border:1px solid rgba(200,180,220,.25);border-top:none;display:grid;grid-template-columns:56px repeat(7,1fr);background:rgba(255,255,255,.5)}
+    .cal-workload-wrap{width:100%;border:1px solid rgba(200,180,220,.25);border-top:none;display:grid;grid-template-columns:56px repeat(7,1fr);background:rgba(255,255,255,.5)}
     .cal-workload-gutter{border-right:1px solid rgba(200,180,220,.2);padding:3px 5px 3px 0;display:flex;align-items:center;justify-content:flex-end}
     .cal-wl-label{font-size:.58rem;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em}
     .cal-workload-col{border-right:1px solid rgba(200,180,220,.12);padding:4px 5px;display:flex;flex-direction:column;gap:2px}
@@ -444,7 +450,7 @@
     .cal-add-hint-inner{background:rgba(255,249,196,.78);border:1.5px dashed var(--yellow-accent);border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:600;color:var(--yellow-accent);white-space:nowrap;backdrop-filter:blur(4px)}
 
     /* ── Footer summary bar ── */
-    .cal-footer{min-width:560px;border:1px solid rgba(200,180,220,.25);border-top:none;border-radius:0 0 14px 14px;background:rgba(255,255,255,.6);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+    .cal-footer{width:100%;border:1px solid rgba(200,180,220,.25);border-top:none;border-radius:0 0 14px 14px;background:rgba(255,255,255,.6);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;box-sizing:border-box}
     .cal-footer-stats{display:flex;gap:16px;flex-wrap:wrap}
     .cal-footer-stat{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text-mid)}
     .cal-footer-stat-num{font-family:'Playfair Display',serif;font-weight:600;color:var(--text-dark);font-size:.95rem}
@@ -710,21 +716,19 @@
 
         <!-- Main grid column -->
         <div class="cal-right">
-          <!-- All-day strip (due dates) -->
-          <div style="overflow-x:auto">
-            <div class="cal-allday-wrap" id="cal-allday"></div>
-          </div>
-          <!-- Workload bars -->
-          <div style="overflow-x:auto">
-            <div class="cal-workload-wrap" id="cal-workload"></div>
-          </div>
-          <!-- Timed grid -->
-          <div class="cal-grid-wrap">
-            <div class="cal-grid" id="cal-grid"></div>
-          </div>
-          <!-- Footer -->
-          <div style="overflow-x:auto">
-            <div class="cal-footer" id="cal-footer"></div>
+          <div class="cal-hscroll">
+            <div class="cal-hscroll-inner">
+              <!-- All-day strip (due dates) -->
+              <div class="cal-allday-wrap" id="cal-allday"></div>
+              <!-- Workload bars -->
+              <div class="cal-workload-wrap" id="cal-workload"></div>
+              <!-- Timed grid -->
+              <div class="cal-grid-wrap">
+                <div class="cal-grid" id="cal-grid"></div>
+              </div>
+              <!-- Footer -->
+              <div class="cal-footer" id="cal-footer"></div>
+            </div>
           </div>
           <!-- Empty week state -->
           <div id="cal-empty-week" style="display:none">
