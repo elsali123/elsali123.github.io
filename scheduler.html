@@ -414,8 +414,11 @@
     .cal-day-col.weekend-col{background:rgba(220,215,235,.08)}
     .cal-day-col.today-col.weekend-col{background:rgba(252,228,236,.12)}
     .cal-day-col:hover .cal-add-hint{opacity:1}
-    .cal-hour-row{height:48px;border-bottom:1px solid rgba(200,180,220,.12)}
-    .cal-half-row{height:24px;border-bottom:1px dashed rgba(200,180,220,.08)}
+    /* Each hour cell is split into two halves of 24px, totalling 48px — must
+       match PX in renderCalendar. Top half's border marks the 30-min line
+       (dashed), bottom half's border marks the next hour line (solid). */
+    .cal-hour-row{height:24px;border-bottom:1px dashed rgba(200,180,220,.10)}
+    .cal-half-row{height:24px;border-bottom:1px solid rgba(200,180,220,.18)}
 
     /* Events */
     .cal-events-layer{position:absolute;top:0;left:2px;right:2px;pointer-events:none}
@@ -1434,7 +1437,7 @@ function renderCalendar() {
   // ── Place event blocks ──
   days.forEach((d,di)=>{
     const dateStr = d.toISOString().slice(0,10);
-    const dayEvents = events.filter(e=>e.date===dateStr);
+    const dayEvents = events.filter(e=>e.date===dateStr && e.timeStart);
     if (!dayEvents.length) return;
     const cols = grid.querySelectorAll(`.cal-day-col[data-day="${di}"]`);
     if (!cols.length) return;
@@ -1443,18 +1446,59 @@ function renderCalendar() {
     overlay.className='cal-events-layer';
     overlay.style.cssText=`position:absolute;top:0;left:2px;right:2px;height:${CAL_END*PX}px;pointer-events:none;`;
     firstCol.style.overflow='visible';
+
+    // ── Lay out overlapping events side-by-side ──
+    // 1. Sort by start time (then by longer duration first so outer events land on the left)
+    // 2. Group events into clusters where every event overlaps at least one other in the cluster
+    // 3. Within each cluster, greedy-assign each event to the leftmost free column
+    // 4. Every event in a cluster gets width = 1 / (columns used by the cluster)
+    const laid = dayEvents.map(evt => ({
+      evt,
+      s: timeToMins(evt.timeStart),
+      e: evt.timeEnd ? timeToMins(evt.timeEnd) : timeToMins(evt.timeStart) + 30
+    })).sort((a,b) => a.s - b.s || b.e - a.e);
+
+    const layout = new Map(); // evt → { col, cols }
+    let i = 0;
+    while (i < laid.length) {
+      const cluster = [laid[i]];
+      let clusterEnd = laid[i].e;
+      let j = i + 1;
+      while (j < laid.length && laid[j].s < clusterEnd) {
+        cluster.push(laid[j]);
+        clusterEnd = Math.max(clusterEnd, laid[j].e);
+        j++;
+      }
+      const tracks = []; // tracks[k] = end time of whatever is currently in column k
+      for (const item of cluster) {
+        let col = tracks.findIndex(end => end <= item.s);
+        if (col === -1) { col = tracks.length; tracks.push(item.e); }
+        else tracks[col] = item.e;
+        layout.set(item.evt, { col, cols: 0 });
+      }
+      const maxCols = tracks.length;
+      for (const item of cluster) layout.get(item.evt).cols = maxCols;
+      i = j;
+    }
+
     dayEvents.forEach(evt=>{
       const cat=CAT_META[evt.category];
-      const sm=evt.timeStart?timeToMins(evt.timeStart):-1;
+      const sm=timeToMins(evt.timeStart);
       const em=evt.timeEnd?timeToMins(evt.timeEnd):-1;
-      let topPx=0,hPx=PX;
-      if(sm>=0) topPx=Math.max(0,(sm/60)*PX);
-      if(sm>=0&&em>sm) hPx=Math.max(28,((em-sm)/60)*PX);
+      const topPx=Math.max(0,(sm/60)*PX);
+      const hPx=em>sm ? Math.max(28,((em-sm)/60)*PX) : PX;
+      const { col, cols } = layout.get(evt) || { col: 0, cols: 1 };
+      const widthPct = 100 / cols;
+      const leftPct = col * widthPct;
       const el=document.createElement('div');
       el.className=`cal-event ${cat.evtCls}`;
-      let evtStyle=`top:${topPx}px;height:${hPx}px;position:absolute;left:0;right:0;pointer-events:all;`;
+      // Leave a 2px sliver on the right of each block so adjacent overlapping
+      // events are visually distinguishable.
+      let evtStyle=`top:${topPx}px;height:${hPx}px;position:absolute;left:${leftPct}%;width:calc(${widthPct}% - 2px);pointer-events:all;`;
       if (evt.gcalColor) {
-        evtStyle += `background:${hexToRgba(evt.gcalColor,.22)};color:${darkenHex(evt.gcalColor,.35)};border-left:3px solid ${evt.gcalColor};`;
+        // Near-solid fill so stacked gcal blocks read clearly; text color is
+        // picked from the background's luminance.
+        evtStyle += `background:${hexToRgba(evt.gcalColor,.92)};color:${readableOn(evt.gcalColor)};border-left:3px solid ${darkenHex(evt.gcalColor,.18)};`;
       }
       el.style.cssText=evtStyle;
       if(evt.done) el.style.opacity='0.45';
@@ -1787,6 +1831,7 @@ function todayStr2(){return new Date().toISOString().slice(0,10);}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function hexToRgba(hex,a){const h=(hex||'').replace('#','');if(h.length!==6)return `rgba(96,125,139,${a})`;const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function darkenHex(hex,amt){const h=(hex||'').replace('#','');if(h.length!==6)return hex||'#333';const r=Math.max(0,Math.round(parseInt(h.slice(0,2),16)*(1-amt)));const g=Math.max(0,Math.round(parseInt(h.slice(2,4),16)*(1-amt)));const b=Math.max(0,Math.round(parseInt(h.slice(4,6),16)*(1-amt)));return `rgb(${r},${g},${b})`;}
+function readableOn(hex){const h=(hex||'').replace('#','');if(h.length!==6)return '#2c2c2c';const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);const lum=(0.299*r+0.587*g+0.114*b)/255;return lum>0.62?'#2c2c2c':'#ffffff';}
 
 function switchView(name) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
