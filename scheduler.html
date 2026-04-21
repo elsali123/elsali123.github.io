@@ -35,7 +35,10 @@
     @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
     @keyframes slideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
-    .container{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:40px 20px 100px}
+    .container{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:40px 20px 100px;transition:max-width .2s ease}
+    /* When the Calendar tab is active, widen the whole container so the week
+       grid has room to breathe. Stays centered via `margin:0 auto`. */
+    body.view-calendar .container{max-width:min(1400px, calc(100vw - 40px))}
 
     /* ── Header ── */
     header{text-align:center;margin-bottom:36px;animation:fadeDown .7s ease both}
@@ -351,7 +354,19 @@
 
     /* ── Two-panel layout ── */
     .cal-body{display:grid;grid-template-columns:172px 1fr;gap:16px;align-items:start}
-    @media(max-width:700px){.cal-body{grid-template-columns:1fr}.cal-mini-month-wrap{display:none}}
+    @media(max-width:700px){.cal-body{grid-template-columns:1fr}.cal-side{display:none}}
+    .cal-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+    /* ── Calendar source filter ── */
+    .cal-filter-wrap{background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.85);border-radius:14px;padding:12px 12px 10px}
+    .cal-filter-title{font-family:'Playfair Display',serif;font-size:.82rem;font-weight:600;color:var(--text-dark);margin-bottom:8px}
+    .cal-filter-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto}
+    .cal-filter-row{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.78rem;color:var(--text-mid);line-height:1.2}
+    .cal-filter-row input{appearance:none;-webkit-appearance:none;width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(200,180,220,.6);cursor:pointer;flex:none;position:relative;margin:0}
+    .cal-filter-row input:checked{background:var(--pink-deep);border-color:var(--pink-deep)}
+    .cal-filter-row input:checked::after{content:'✓';position:absolute;inset:0;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;line-height:1}
+    .cal-filter-swatch{width:10px;height:10px;border-radius:3px;flex:none}
+    .cal-filter-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
     /* ── Mini month ── */
     .cal-mini-month-wrap{background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.85);border-radius:14px;padding:14px 12px}
@@ -375,7 +390,7 @@
     /* Single horizontal scroll track for allday + workload + grid + footer so
        they all scroll in lockstep. */
     .cal-hscroll{overflow-x:auto;max-width:100%;border-radius:14px}
-    .cal-hscroll-inner{min-width:960px;display:flex;flex-direction:column}
+    .cal-hscroll-inner{min-width:960px;display:flex;flex-direction:column;width:100%}
     .cal-grid-wrap{overflow-x:visible;overflow-y:auto;max-height:65vh;border-radius:0 0 14px 14px}
     .cal-grid{display:grid;grid-template-columns:56px repeat(7,1fr);width:100%;border:1px solid rgba(200,180,220,.25);border-bottom:none;border-radius:14px 14px 0 0;overflow:hidden;background:rgba(255,255,255,.55)}
 
@@ -704,14 +719,20 @@
       </div>
 
       <div class="cal-body">
-        <!-- Mini month navigator -->
-        <div class="cal-mini-month-wrap">
-          <div class="cal-mini-nav">
-            <button class="cal-mini-btn" id="mini-prev">‹</button>
-            <div class="cal-mini-title" id="mini-title"></div>
-            <button class="cal-mini-btn" id="mini-next">›</button>
+        <!-- Mini month + calendar-source filter -->
+        <div class="cal-side">
+          <div class="cal-mini-month-wrap">
+            <div class="cal-mini-nav">
+              <button class="cal-mini-btn" id="mini-prev">‹</button>
+              <div class="cal-mini-title" id="mini-title"></div>
+              <button class="cal-mini-btn" id="mini-next">›</button>
+            </div>
+            <div class="cal-mini-grid" id="mini-grid"></div>
           </div>
-          <div class="cal-mini-grid" id="mini-grid"></div>
+          <div class="cal-filter-wrap" id="cal-filter-wrap" style="display:none">
+            <div class="cal-filter-title">Calendars</div>
+            <div class="cal-filter-list" id="cal-filter-list"></div>
+          </div>
         </div>
 
         <!-- Main grid column -->
@@ -849,6 +870,50 @@
   </div>
 </div>
 
+<!-- GOOGLE CALENDAR EVENT EDIT MODAL -->
+<div class="modal-overlay" id="gcal-edit-modal">
+  <div class="modal" style="max-width:500px">
+    <button class="modal-close" id="gcal-edit-close">✕</button>
+    <div class="modal-title">📅 Edit Calendar Event</div>
+    <div style="font-size:.78rem;color:var(--text-light);margin:-8px 0 14px" id="gcal-edit-source"></div>
+
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Title</label>
+        <input type="text" id="gcal-edit-name" />
+      </div>
+      <div class="form-group full">
+        <label class="toggle-row" style="padding:0;margin:0;border:none;background:transparent">
+          <input type="checkbox" id="gcal-edit-allday" style="width:18px;height:18px;cursor:pointer">
+          <span class="toggle-label" style="margin-left:8px"><strong>All-day</strong></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="gcal-edit-date" />
+      </div>
+      <div class="form-group" id="gcal-edit-time-group">
+        <label>Time range</label>
+        <div class="time-range-row">
+          <input type="time" id="gcal-edit-time-start" />
+          <span class="time-sep">–</span>
+          <input type="time" id="gcal-edit-time-end" />
+        </div>
+      </div>
+      <div class="form-group full">
+        <label>Notes</label>
+        <textarea id="gcal-edit-notes" placeholder="Notes / location"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-save" id="gcal-edit-save">Save to Google</button>
+      <button class="btn-cancel" id="gcal-edit-delete" style="background:rgba(244,67,54,.12);color:#c62828">Delete</button>
+      <button class="btn-cancel" id="gcal-edit-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -893,6 +958,43 @@ function migrateGcalTasksOutOfTasks() {
   return true;
 }
 function saveGcalEvents(){ localStorage.setItem('bloom-gcal-events', JSON.stringify(gcalEvents)); }
+
+// Hidden calendar IDs — used by the source-filter checkboxes in the calendar view.
+let gcalHidden = new Set(JSON.parse(localStorage.getItem('bloom-gcal-hidden') || '[]'));
+function saveGcalHidden(){
+  localStorage.setItem('bloom-gcal-hidden', JSON.stringify([...gcalHidden]));
+}
+function renderGcalFilter(){
+  const wrap = document.getElementById('cal-filter-wrap');
+  const list = document.getElementById('cal-filter-list');
+  if (!wrap || !list) return;
+  // Build the unique (calendarId, name, color) set from imported events.
+  const byId = new Map();
+  (gcalEvents || []).forEach(g => {
+    const id = g.calendarId || g.calendarName || '';
+    if (!id) return;
+    if (!byId.has(id)) byId.set(id, { id, name: g.calendarName || 'Calendar', color: g.color || '#4285f4' });
+  });
+  if (!byId.size) { wrap.style.display = 'none'; list.innerHTML = ''; return; }
+  wrap.style.display = 'block';
+  const items = [...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
+  list.innerHTML = items.map(c => {
+    const checked = gcalHidden.has(c.id) ? '' : 'checked';
+    return `<label class="cal-filter-row">
+      <input type="checkbox" data-cal-id="${esc(c.id)}" ${checked}>
+      <span class="cal-filter-swatch" style="background:${c.color}"></span>
+      <span class="cal-filter-name" title="${esc(c.name)}">${esc(c.name)}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('input[data-cal-id]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = cb.dataset.calId;
+      if (cb.checked) gcalHidden.delete(id); else gcalHidden.add(id);
+      saveGcalHidden();
+      renderCalendar();
+    });
+  });
+}
 
 // Run migration once on boot so the cleanup happens for the local cache too.
 if (migrateGcalTasksOutOfTasks()) {
@@ -1340,9 +1442,12 @@ function renderCalendar() {
   });
 
   // Timed Google Calendar imports — rendered as color-coded blocks.
+  // Skip calendars the user has hidden via the filter UI.
   const gcalAllDayThisWeek = [];
   (gcalEvents || []).forEach(g => {
     if (!g.date) return;
+    const srcId = g.calendarId || g.calendarName || '';
+    if (srcId && gcalHidden.has(srcId)) return;
     const gd = new Date(g.date+'T00:00:00'); gd.setHours(0,0,0,0);
     if (gd < ws || gd > we) return;
     if (g.allDay || !g.timeStart) {
@@ -1357,6 +1462,9 @@ function renderCalendar() {
       });
     }
   });
+
+  // Refresh the per-calendar filter checkbox list.
+  renderGcalFilter();
 
   const CAL_START=0, CAL_END=24, PX=48;
   const isWeekend = d => d.getDay()===0||d.getDay()===6;
@@ -1381,7 +1489,7 @@ function renderCalendar() {
       const bg    = hexToRgba(color, .18);
       const fg    = darkenHex(color, .25);
       const title = g.name + (g.calendarName ? ' · ' + g.calendarName : '');
-      alldayHtml += `<div class="cal-due-chip" title="${esc(title)}" style="background:${bg};color:${fg};border-left:3px solid ${color}">${esc(g.name)}</div>`;
+      alldayHtml += `<div class="cal-due-chip" title="${esc(title)}" style="background:${bg};color:${fg};border-left:3px solid ${color};cursor:pointer" onclick="openGcalEdit('${g.id}')">${esc(g.name)}</div>`;
     });
     alldayHtml += `</div>`;
   });
@@ -1510,7 +1618,12 @@ function renderCalendar() {
       el.innerHTML=`<div class="cal-event-name">${esc(evt.name)}</div>${tl?`<div class="cal-event-time">${tl}</div>`:''}${evt.goal?`<div class="cal-event-time" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(evt.goal)}</div>`:''}`;
       const titleSuffix = evt.gcalName ? ` · ${evt.gcalName}` : '';
       el.title=`${evt.name}${tl?' | '+tl:''}${evt.goal?' | '+evt.goal:''}${titleSuffix}`;
-      el.addEventListener('click',e=>{e.stopPropagation();if(evt.taskId)toggleSessions(evt.taskId);});
+      el.addEventListener('click',e=>{
+        e.stopPropagation();
+        if (evt.taskId) { toggleSessions(evt.taskId); return; }
+        if (evt.gcalEventId) openGcalEdit(evt.gcalEventId);
+      });
+      if (evt.gcalEventId) el.style.cursor = 'pointer';
       overlay.appendChild(el);
     });
     firstCol.appendChild(overlay);
@@ -1842,6 +1955,8 @@ function switchView(name) {
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   document.querySelector(`.nav-tab[data-view="${name}"]`).classList.add('active');
+  // Toggle body class so the calendar view can break out of the 980px container.
+  document.body.classList.toggle('view-calendar', name === 'calendar');
   if(name==='calendar'){
     renderCalendar();
     // Scroll to current time (or 8 AM if not today's week)
@@ -1865,71 +1980,159 @@ const SUPABASE_URL = 'https://zyfzgezjusyfxmfuhvfk.supabase.co';       // e.g. h
 const SUPABASE_ANON_KEY = 'sb_publishable_rpF1rLZ3Hrgjn4mPRILLCg_RmUf6C6n';
 
 let sbClient = null, sbUser = null, sbSyncTimer = null;
+let sbLoaded = false;  // guard so we only load the cloud payload once per session
 
 function fbSetStatus(state, text) {
   const dot   = document.getElementById('sync-dot');
   const label = document.getElementById('sync-label');
+  if (!dot || !label) return;
   dot.className = 'sync-dot' + (state ? ' ' + state : '');
   label.textContent = text;
 }
 
-function fbInit() {
-  if (typeof supabase === 'undefined') return;
-  if (SUPABASE_URL === 'YOUR_SUPABASE_URL') return; // not configured yet
+// Show the signed-in UI immediately when we know a user is present, without
+// waiting for the cloud round-trip.
+function fbShowSignedIn(user) {
+  sbUser = user;
+  document.getElementById('sync-signed-out').style.display = 'none';
+  document.getElementById('sync-signed-in').style.display  = 'block';
+  document.getElementById('sync-email').textContent = user.email || 'Signed in';
+}
 
-  sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+function fbShowSignedOut() {
+  sbUser = null;
+  sbLoaded = false;
+  document.getElementById('sync-signed-out').style.display = 'block';
+  document.getElementById('sync-signed-in').style.display  = 'none';
+  fbSetStatus('', 'Not connected');
+}
 
-  sbClient.auth.onAuthStateChange(async (event, session) => {
-    sbUser = session?.user ?? null;
-    if (sbUser) {
-      document.getElementById('sync-signed-out').style.display = 'none';
-      document.getElementById('sync-signed-in').style.display  = 'block';
-      document.getElementById('sync-email').textContent = sbUser.email || 'Signed in';
-      fbSetStatus('saving', 'Loading…');
+// Run a Supabase query with a timeout. The underlying request isn't actually
+// cancelled (the SDK doesn't support cancellation), but we stop waiting on it.
+async function fbWithTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, rej) => {
+    timer = setTimeout(() => rej(new Error(label + ' timed out after ' + ms + 'ms')), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
-      try {
-        const loadQuery = sbClient
-          .from('tasks')
-          .select('data')
-          .eq('user_id', sbUser.id)
-          .maybeSingle();
-        const timeout = new Promise((_, rej) =>
-          setTimeout(() => rej(new Error('Load timed out')), 10000));
-        const { data, error } = await Promise.race([loadQuery, timeout]);
-        if (error) throw error;
+// Load the user's payload with a couple of quick retries before surfacing an
+// error. Each attempt has its own timeout so one slow call can't starve the
+// whole budget.
+async function fbLoadUserPayload(userId) {
+  const attempts = [3500, 5000, 7000];  // ms budget per attempt
+  let lastErr;
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      const q = sbClient.from('tasks').select('data').eq('user_id', userId).maybeSingle();
+      const { data, error } = await fbWithTimeout(q, attempts[i], 'Load');
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      lastErr = e;
+      console.warn(`Supabase load attempt ${i+1} failed:`, e.message || e);
+      if (i < attempts.length - 1) {
+        // 800ms then 2.5s backoff — enough to outlast transient blips / token
+        // refreshes without making the user stare at "Loading…" forever.
+        await new Promise(r => setTimeout(r, i === 0 ? 800 : 2500));
+      }
+    }
+  }
+  throw lastErr;
+}
 
-        if (data?.data) {
-          const payload = data.data;
-          // Legacy payloads are a bare tasks array; new payloads are
-          // `{ tasks, gcalEvents }`. Handle both.
-          if (Array.isArray(payload)) {
-            tasks = payload;
-          } else {
-            tasks = Array.isArray(payload.tasks) ? payload.tasks : [];
-            if (Array.isArray(payload.gcalEvents)) gcalEvents = payload.gcalEvents;
-            saveGcalEvents();
-          }
-          // Strip any Google Calendar events that were previously stored as
-          // tasks in the cloud, and push the cleaned payload back up.
-          const migrated = migrateGcalTasksOutOfTasks();
-          if (migrated) saveGcalEvents();
-          await sbClient.from('tasks').upsert({ user_id: sbUser.id, data: { tasks, gcalEvents }, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-          render();
-          showToast('Tasks loaded from cloud ☁️');
-        } else {
-          // First sign-in — push existing tasks up
-          await sbClient.from('tasks').upsert({ user_id: sbUser.id, data: { tasks, gcalEvents }, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-        }
-        fbSetStatus('live', 'Synced');
-      } catch (e) {
-        fbSetStatus('error', 'Sync error');
-        console.warn('Supabase load failed:', e);
+async function fbHandleSignedIn(user) {
+  if (sbLoaded) return;             // don't re-run on TOKEN_REFRESHED / USER_UPDATED
+  sbLoaded = true;
+  fbShowSignedIn(user);
+  fbSetStatus('saving', 'Loading…');
+
+  try {
+    const data = await fbLoadUserPayload(user.id);
+
+    if (data?.data) {
+      const payload = data.data;
+      // Legacy payloads are a bare tasks array; new payloads are
+      // `{ tasks, gcalEvents }`. Handle both.
+      if (Array.isArray(payload)) {
+        tasks = payload;
+      } else {
+        tasks = Array.isArray(payload.tasks) ? payload.tasks : [];
+        if (Array.isArray(payload.gcalEvents)) gcalEvents = payload.gcalEvents;
+        saveGcalEvents();
+      }
+      const migrated = migrateGcalTasksOutOfTasks();
+      if (migrated) saveGcalEvents();
+      // Render first so the user sees their data; push the cleaned payload
+      // back to the cloud in the background without blocking.
+      render();
+      showToast('Tasks loaded from cloud ☁️');
+      if (migrated || !Array.isArray(payload)) {
+        sbClient.from('tasks')
+          .upsert({ user_id: user.id, data: { tasks, gcalEvents }, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+          .then(({ error }) => { if (error) console.warn('Background write-back failed:', error); });
       }
     } else {
-      document.getElementById('sync-signed-out').style.display = 'block';
-      document.getElementById('sync-signed-in').style.display  = 'none';
-      fbSetStatus('', 'Not connected');
+      // First sign-in — push existing tasks up (non-blocking)
+      sbClient.from('tasks')
+        .upsert({ user_id: user.id, data: { tasks, gcalEvents }, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+        .then(({ error }) => { if (error) console.warn('Initial upsert failed:', error); });
     }
+    fbSetStatus('live', 'Synced');
+  } catch (e) {
+    fbSetStatus('error', 'Sync error');
+    console.warn('Supabase load failed (all retries):', e);
+    sbLoaded = false;  // allow another attempt if auth fires again
+  }
+}
+
+function fbInit(retries = 16) {
+  if (typeof supabase === 'undefined') {
+    // Supabase SDK hasn't loaded yet — retry every 500ms for up to ~8s, which
+    // covers slow networks and adblocker delays without hanging forever.
+    if (retries > 0) setTimeout(() => fbInit(retries - 1), 500);
+    else console.warn('Supabase SDK never loaded — cloud sync disabled');
+    return;
+  }
+  if (SUPABASE_URL === 'YOUR_SUPABASE_URL') return;
+  if (sbClient) return;  // already initialised
+
+  sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      // No-op lock: the default `navigator.locks` impl blocks across tabs/
+      // iframes on the same origin, which caused "Loading…" to hang for 10s+
+      // when the scheduler was open in both the iframe and a standalone tab.
+      // Concurrent token refreshes are safe (idempotent), so skipping the
+      // lock is preferable to the hang.
+      lock: async (_name, _acquireTimeout, fn) => fn()
+    }
+  });
+
+  // Kick off an immediate session read so signed-in users don't have to wait
+  // for the async onAuthStateChange event to fire before loading starts.
+  sbClient.auth.getSession().then(({ data: { session } }) => {
+    if (session?.user) fbHandleSignedIn(session.user);
+    else fbShowSignedOut();
+  }).catch(e => console.warn('getSession failed:', e));
+
+  sbClient.auth.onAuthStateChange((event, session) => {
+    const user = session?.user ?? null;
+    if (event === 'SIGNED_OUT' || !user) {
+      fbShowSignedOut();
+      return;
+    }
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+      fbHandleSignedIn(user);
+      return;
+    }
+    // TOKEN_REFRESHED, USER_UPDATED, etc. — just keep the cached user fresh
+    // without re-running the whole load flow.
+    sbUser = user;
   });
 }
 
@@ -1946,6 +2149,7 @@ function fbSignOut() {
   // Reset UI and local state immediately — don't wait for the Supabase call,
   // which can hang under lock contention.
   sbUser = null;
+  sbLoaded = false;
   try {
     document.getElementById('sync-signed-out').style.display = 'block';
     document.getElementById('sync-signed-in').style.display  = 'none';
@@ -1983,15 +2187,50 @@ function fbSave() {
   }, 800);
 }
 
-window.addEventListener('load', () => setTimeout(fbInit, 500));
+window.addEventListener('load', () => fbInit());
 
 // ═══════════════════════════════════════════
 // GOOGLE CALENDAR INTEGRATION
 // ═══════════════════════════════════════════
 const GCAL_CLIENT_ID = '947932872218-u7d89l3dg8unj50e098b2c3nsgu0n0ld.apps.googleusercontent.com';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events openid email';
+const GCAL_CACHE_KEY = 'bloom-gcal-token';
 
 let gcalTokenClient = null;
 let gcalToken = null;
+let gcalTokenExpiresAt = 0;
+let gcalEmail = '';
+
+function gcalPersist() {
+  try {
+    if (gcalToken && gcalTokenExpiresAt > Date.now()) {
+      localStorage.setItem(GCAL_CACHE_KEY, JSON.stringify({
+        token: gcalToken, expiresAt: gcalTokenExpiresAt, email: gcalEmail
+      }));
+    } else {
+      localStorage.removeItem(GCAL_CACHE_KEY);
+    }
+  } catch (_) {}
+}
+function gcalLoadCached() {
+  try {
+    const raw = localStorage.getItem(GCAL_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.token || !parsed?.expiresAt) return null;
+    if (parsed.expiresAt <= Date.now() + 30000) return null; // expired / <30s left
+    return parsed;
+  } catch (_) { return null; }
+}
+function gcalShowConnected(email) {
+  document.getElementById('gcal-email').textContent = email || 'Connected';
+  document.getElementById('gcal-disconnected').style.display = 'none';
+  document.getElementById('gcal-connected').style.display   = 'block';
+}
+function gcalShowDisconnected() {
+  document.getElementById('gcal-connected').style.display   = 'none';
+  document.getElementById('gcal-disconnected').style.display = 'block';
+}
 
 // Set default date range (today → +14 days)
 (function() {
@@ -2003,30 +2242,61 @@ let gcalToken = null;
 })();
 
 // Called by Google's GIS library once it loads
+let gcalSilentInFlight = false;
 function gcalInit() {
   if (typeof google === 'undefined' || !google.accounts) return;
+  if (gcalTokenClient) return;
   gcalTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GCAL_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+    scope: GCAL_SCOPE,
     callback: function(resp) {
-      if (resp.error) { showToast('Google sign-in failed 😢'); return; }
+      gcalSilentInFlight = false;
+      if (resp.error) {
+        if (resp.error !== 'interaction_required' && resp.error !== 'access_denied') {
+          showToast('Google sign-in failed 😢');
+        }
+        return;
+      }
       gcalToken = resp.access_token;
-      // Fetch user email to display
+      const ttl = Number(resp.expires_in || 3600) * 1000;
+      gcalTokenExpiresAt = Date.now() + ttl;
+      // Fetch email once so we can show it + persist it
       fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: 'Bearer ' + gcalToken }
       }).then(r => r.json()).then(info => {
-        document.getElementById('gcal-email').textContent = info.email || 'Connected';
-        document.getElementById('gcal-disconnected').style.display = 'none';
-        document.getElementById('gcal-connected').style.display   = 'block';
+        gcalEmail = info.email || gcalEmail || '';
+        gcalShowConnected(gcalEmail || 'Connected');
+        gcalPersist();
         showToast('Google Calendar connected! 📅');
       }).catch(() => {
-        document.getElementById('gcal-email').textContent = 'Connected';
-        document.getElementById('gcal-disconnected').style.display = 'none';
-        document.getElementById('gcal-connected').style.display   = 'block';
+        gcalShowConnected(gcalEmail || 'Connected');
+        gcalPersist();
         showToast('Google Calendar connected! 📅');
       });
     }
   });
+
+  // Restore a cached token if still valid — skips the popup.
+  const cached = gcalLoadCached();
+  if (cached) {
+    gcalToken = cached.token;
+    gcalTokenExpiresAt = cached.expiresAt;
+    gcalEmail = cached.email || '';
+    gcalShowConnected(gcalEmail || 'Connected');
+  }
+}
+
+function gcalRequestToken(silent) {
+  if (!gcalTokenClient) return false;
+  if (silent) {
+    if (gcalSilentInFlight) return true;
+    gcalSilentInFlight = true;
+    try { gcalTokenClient.requestAccessToken({ prompt: '' }); }
+    catch (_) { gcalSilentInFlight = false; return false; }
+    return true;
+  }
+  gcalTokenClient.requestAccessToken({ prompt: 'consent' });
+  return true;
 }
 
 function gcalConnect() {
@@ -2035,18 +2305,160 @@ function gcalConnect() {
   }
   if (!gcalTokenClient) {
     // GIS may still be loading — retry once
-    setTimeout(() => { gcalInit(); if (gcalTokenClient) gcalTokenClient.requestAccessToken(); }, 800);
+    setTimeout(() => { gcalInit(); if (gcalTokenClient) gcalRequestToken(false); }, 800);
     return;
   }
-  gcalTokenClient.requestAccessToken();
+  gcalRequestToken(false);
 }
 
 function gcalDisconnect() {
-  if (gcalToken) google.accounts.oauth2.revoke(gcalToken, () => {});
+  if (gcalToken) { try { google.accounts.oauth2.revoke(gcalToken, () => {}); } catch(_) {} }
   gcalToken = null;
-  document.getElementById('gcal-connected').style.display   = 'none';
-  document.getElementById('gcal-disconnected').style.display = 'block';
+  gcalTokenExpiresAt = 0;
+  gcalEmail = '';
+  gcalPersist();
+  gcalShowDisconnected();
   showToast('Disconnected from Google Calendar');
+}
+
+async function gcalEnsureToken() {
+  if (gcalToken && gcalTokenExpiresAt > Date.now() + 30000) return true;
+  // Try silent reauth and wait up to 5s for the callback to fire.
+  if (!gcalTokenClient) return false;
+  gcalRequestToken(true);
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 150));
+    if (gcalToken && gcalTokenExpiresAt > Date.now() + 10000) return true;
+    if (!gcalSilentInFlight) break;
+  }
+  return !!(gcalToken && gcalTokenExpiresAt > Date.now() + 10000);
+}
+
+// ─── Edit a Google Calendar event and sync the change back to Google ───
+// `editingGcalLocalId` is the local gcalEvents[i].id (our uid), not Google's
+// event id. We use it so we can find and update the same local entry after
+// a successful PATCH/DELETE.
+let editingGcalLocalId = null;
+
+function openGcalEdit(localId) {
+  const g = (gcalEvents || []).find(x => x.id === localId);
+  if (!g) { showToast('Event not found'); return; }
+  if (!g.calendarId || !g.gcalId) {
+    showToast('This event is missing its Google Calendar link'); return;
+  }
+  editingGcalLocalId = localId;
+  document.getElementById('gcal-edit-name').value      = g.name || '';
+  document.getElementById('gcal-edit-date').value      = g.date || '';
+  document.getElementById('gcal-edit-time-start').value= g.timeStart || '';
+  document.getElementById('gcal-edit-time-end').value  = g.timeEnd || '';
+  document.getElementById('gcal-edit-notes').value     = g.notes || '';
+  const allday = document.getElementById('gcal-edit-allday');
+  allday.checked = !!g.allDay;
+  document.getElementById('gcal-edit-time-group').style.display = allday.checked ? 'none' : '';
+  document.getElementById('gcal-edit-source').textContent = g.calendarName
+    ? 'Source: ' + g.calendarName : '';
+  document.getElementById('gcal-edit-modal').classList.add('active');
+}
+function closeGcalEdit() {
+  editingGcalLocalId = null;
+  document.getElementById('gcal-edit-modal').classList.remove('active');
+}
+
+async function gcalSaveEdit() {
+  const g = (gcalEvents || []).find(x => x.id === editingGcalLocalId);
+  if (!g) { closeGcalEdit(); return; }
+  const name = document.getElementById('gcal-edit-name').value.trim();
+  const date = document.getElementById('gcal-edit-date').value;
+  const ts   = document.getElementById('gcal-edit-time-start').value;
+  const te   = document.getElementById('gcal-edit-time-end').value;
+  const notes= document.getElementById('gcal-edit-notes').value.trim();
+  const allDay = document.getElementById('gcal-edit-allday').checked;
+  if (!name) { showToast('Name required'); return; }
+  if (!date) { showToast('Date required'); return; }
+  if (!allDay && (!ts || !te)) { showToast('Start and end time required'); return; }
+
+  const ok = await gcalEnsureToken();
+  if (!ok) { showToast('Please reconnect to Google Calendar'); return; }
+
+  // Build the event body. Google Calendar expects date-only objects for all-day
+  // events and dateTime+timeZone for timed events.
+  const body = { summary: name, description: notes };
+  if (allDay) {
+    // `end.date` is exclusive in the API, so add one day.
+    const d = new Date(date + 'T00:00:00');
+    const next = new Date(d); next.setDate(d.getDate()+1);
+    const pad = n => String(n).padStart(2,'0');
+    const nextStr = `${next.getFullYear()}-${pad(next.getMonth()+1)}-${pad(next.getDate())}`;
+    body.start = { date };
+    body.end   = { date: nextStr };
+  } else {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    body.start = { dateTime: `${date}T${ts}:00`, timeZone: tz };
+    body.end   = { dateTime: `${date}T${te}:00`, timeZone: tz };
+  }
+
+  const url = 'https://www.googleapis.com/calendar/v3/calendars/'
+    + encodeURIComponent(g.calendarId) + '/events/' + encodeURIComponent(g.gcalId);
+  try {
+    const resp = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer ' + gcalToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+      const errTxt = await resp.text();
+      console.error('gcal PATCH failed', resp.status, errTxt);
+      showToast(resp.status === 403 ? 'Not allowed to edit this calendar' : 'Update failed 😢');
+      return;
+    }
+    // Mirror the change locally.
+    g.name = name; g.notes = notes; g.date = date;
+    g.allDay = allDay;
+    g.timeStart = allDay ? '' : ts;
+    g.timeEnd   = allDay ? '' : te;
+    saveGcalEvents();
+    closeGcalEdit();
+    render();
+    showToast('Saved to Google Calendar ✓');
+  } catch (e) {
+    console.error(e);
+    showToast('Network error reaching Google Calendar');
+  }
+}
+
+async function gcalDeleteEdit() {
+  const g = (gcalEvents || []).find(x => x.id === editingGcalLocalId);
+  if (!g) { closeGcalEdit(); return; }
+  if (!confirm('Delete "' + g.name + '" from Google Calendar?')) return;
+  const ok = await gcalEnsureToken();
+  if (!ok) { showToast('Please reconnect to Google Calendar'); return; }
+  const url = 'https://www.googleapis.com/calendar/v3/calendars/'
+    + encodeURIComponent(g.calendarId) + '/events/' + encodeURIComponent(g.gcalId);
+  try {
+    const resp = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + gcalToken }
+    });
+    // 204 = deleted, 410 = already gone (treat as success).
+    if (!resp.ok && resp.status !== 410) {
+      showToast(resp.status === 403 ? 'Not allowed to delete' : 'Delete failed 😢');
+      return;
+    }
+    // Remove all local instances tied to this Google event id (handles
+    // recurring events where we imported multiple rows from the same gcalId).
+    gcalEvents = gcalEvents.filter(x => x.gcalId !== g.gcalId || x.calendarId !== g.calendarId);
+    saveGcalEvents();
+    closeGcalEdit();
+    render();
+    showToast('Deleted from Google Calendar');
+  } catch (e) {
+    console.error(e);
+    showToast('Network error reaching Google Calendar');
+  }
 }
 
 function gcalClearImports() {
@@ -2064,6 +2476,11 @@ async function gcalImport() {
   const to   = document.getElementById('gcal-to').value;
   if (!from || !to) { showToast('Please select a date range 📅'); return; }
 
+  // Refresh silently if the cached token is near expiry.
+  if (gcalTokenExpiresAt && gcalTokenExpiresAt < Date.now() + 60000) {
+    await gcalEnsureToken();
+  }
+
   const timeMin = new Date(from + 'T00:00:00').toISOString();
   const timeMax = new Date(to   + 'T23:59:59').toISOString();
   const headers = { Authorization: 'Bearer ' + gcalToken };
@@ -2078,10 +2495,15 @@ async function gcalImport() {
       { headers }
     );
     if (listResp.status === 401) {
-      gcalToken = null;
-      document.getElementById('gcal-connected').style.display   = 'none';
-      document.getElementById('gcal-disconnected').style.display = 'block';
-      showToast('Session expired — please reconnect 🔑'); return;
+      // Try silent reauth once before giving up.
+      gcalToken = null; gcalTokenExpiresAt = 0; gcalPersist();
+      const ok = await gcalEnsureToken();
+      if (!ok) {
+        gcalShowDisconnected();
+        showToast('Session expired — please reconnect 🔑'); return;
+      }
+      // Retry the import with the fresh token.
+      return gcalImport();
     }
     const listData = await listResp.json();
     if (listData.error) { showToast('Calendar error: ' + listData.error.message); return; }
@@ -2223,6 +2645,18 @@ document.getElementById('qa-close-btn').addEventListener('click', closeQuickAdd)
 document.getElementById('qa-cancel-btn').addEventListener('click', closeQuickAdd);
 document.getElementById('quick-add-modal').addEventListener('click', e=>{
   if (e.target===document.getElementById('quick-add-modal')) closeQuickAdd();
+});
+
+// Google Calendar edit modal
+document.getElementById('gcal-edit-save').addEventListener('click', gcalSaveEdit);
+document.getElementById('gcal-edit-delete').addEventListener('click', gcalDeleteEdit);
+document.getElementById('gcal-edit-cancel').addEventListener('click', closeGcalEdit);
+document.getElementById('gcal-edit-close').addEventListener('click', closeGcalEdit);
+document.getElementById('gcal-edit-modal').addEventListener('click', e=>{
+  if (e.target===document.getElementById('gcal-edit-modal')) closeGcalEdit();
+});
+document.getElementById('gcal-edit-allday').addEventListener('change', e=>{
+  document.getElementById('gcal-edit-time-group').style.display = e.target.checked ? 'none' : '';
 });
 
 function jumpToWeekOf(dateStr) {
