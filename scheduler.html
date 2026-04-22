@@ -425,15 +425,15 @@
     .cal-day-num{font-size:1.1rem;font-weight:600;color:var(--text-mid);width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:4px auto 0;transition:all .2s}
     .cal-day-num.today{background:linear-gradient(135deg,var(--pink-deep),var(--blue-deep));color:white;box-shadow:0 3px 12px rgba(244,143,177,.45);font-size:1.15rem}
     .cal-day-name.today-name{color:#c2185b;font-weight:700}
-    .cal-day-header.today-col{background:rgba(252,228,236,.4);border-bottom:2px solid rgba(244,143,177,.45)}
+    .cal-day-header.today-col{background:rgba(252,228,236,.75);border-bottom:3px solid var(--pink-deep);box-shadow:inset 0 -1px 0 rgba(244,143,177,.3)}
     .cal-time-gutter{background:rgba(255,255,255,.5);border-right:1px solid rgba(200,180,220,.2);position:relative}
     .cal-time-gutter-header{border-bottom:1px solid rgba(200,180,220,.2);height:58px}
     .cal-time-label{height:48px;display:flex;align-items:flex-start;justify-content:flex-end;padding:0 8px 0 0;font-size:.68rem;color:var(--text-light);font-weight:500;margin-top:-8px}
     .cal-day-col{border-right:1px solid rgba(200,180,220,.15);position:relative;cursor:pointer}
     .cal-day-col:last-child{border-right:none}
-    .cal-day-col.today-col{background:rgba(252,228,236,.1)}
+    .cal-day-col.today-col{background:rgba(252,228,236,.32)}
     .cal-day-col.weekend-col{background:rgba(220,215,235,.08)}
-    .cal-day-col.today-col.weekend-col{background:rgba(252,228,236,.12)}
+    .cal-day-col.today-col.weekend-col{background:rgba(252,228,236,.36)}
     .cal-day-col:hover .cal-add-hint{opacity:1}
     /* Each hour cell is split into two halves of 24px, totalling 48px — must
        match PX in renderCalendar. Top half's border marks the 30-min line
@@ -1476,20 +1476,13 @@ function renderCalendar() {
   const alldayEl = document.getElementById('cal-allday');
   let alldayHtml = `<div class="cal-allday-gutter"><div class="cal-allday-label">Due</div></div>`;
   days.forEach(d=>{
-    const ds = d.toISOString().slice(0,10);
+    const ds = ymd(d);
     const due = tasks.filter(t=>t.due===ds&&!t.done);
     const wknd = isWeekend(d);
     alldayHtml += `<div class="cal-allday-col${wknd?' weekend-col':''}">`;
     due.forEach(t=>{
       const cat = CAT_META[t.category||'other'];
       alldayHtml += `<div class="cal-due-chip ${cat.cls}" title="${esc(t.name + ' — due ' + ds)}" onclick="openEdit('${t.id}')" style="cursor:pointer">${esc(t.name)}</div>`;
-    });
-    gcalAllDayThisWeek.filter(g=>g.date===ds).forEach(g=>{
-      const color = g.color || '#4285f4';
-      const bg    = hexToRgba(color, .18);
-      const fg    = darkenHex(color, .25);
-      const title = g.name + (g.calendarName ? ' · ' + g.calendarName : '');
-      alldayHtml += `<div class="cal-due-chip" title="${esc(title)}" style="background:${bg};color:${fg};border-left:3px solid ${color};cursor:pointer" onclick="openGcalEdit('${g.id}')">${esc(g.name)}</div>`;
     });
     alldayHtml += `</div>`;
   });
@@ -1500,7 +1493,7 @@ function renderCalendar() {
   let wlHtml = `<div class="cal-workload-gutter"><div class="cal-wl-label">Load</div></div>`;
   let weekTotalMins = 0;
   days.forEach(d=>{
-    const ds = d.toISOString().slice(0,10);
+    const ds = ymd(d);
     const dayEvts = events.filter(e=>e.date===ds);
     let mins = 0;
     dayEvts.forEach(e=>{
@@ -1538,7 +1531,7 @@ function renderCalendar() {
     days.forEach((d,di)=>{
       const isToday = d.getTime()===today.getTime();
       const wknd = isWeekend(d);
-      html += `<div class="cal-day-col${isToday?' today-col':''}${wknd?' weekend-col':''}" data-day="${di}" data-hour="${h}" data-date="${d.toISOString().slice(0,10)}">
+      html += `<div class="cal-day-col${isToday?' today-col':''}${wknd?' weekend-col':''}" data-day="${di}" data-hour="${h}" data-date="${ymd(d)}">
         <div class="cal-add-hint"><div class="cal-add-hint-inner">＋ Add session</div></div>
         <div class="cal-hour-row"></div><div class="cal-half-row"></div>
       </div>`;
@@ -1548,7 +1541,7 @@ function renderCalendar() {
 
   // ── Place event blocks ──
   days.forEach((d,di)=>{
-    const dateStr = d.toISOString().slice(0,10);
+    const dateStr = ymd(d);
     const dayEvents = events.filter(e=>e.date===dateStr && e.timeStart);
     if (!dayEvents.length) return;
     const cols = grid.querySelectorAll(`.cal-day-col[data-day="${di}"]`);
@@ -1679,8 +1672,8 @@ function renderMiniMonth(weekDays) {
   tasks.forEach(t=>(t.sessions||[]).forEach(s=>{if(s.date)sessionDates.add(s.date);}));
 
   // Week range for highlighting
-  const wsStr = weekDays[0].toISOString().slice(0,10);
-  const weStr = weekDays[6].toISOString().slice(0,10);
+  const wsStr = ymd(weekDays[0]);
+  const weStr = ymd(weekDays[6]);
 
   let html = DAY_NAMES.map(n=>`<div class="cal-mini-dow">${n[0]}</div>`).join('');
   // blank cells before first day
@@ -1700,8 +1693,8 @@ function renderMiniMonth(weekDays) {
 
 function placeNowLine(days, calStart, calEnd, pxPerHour) {
   const now = new Date();
-  const todayStr = now.toISOString().slice(0,10);
-  const todayIdx = days.findIndex(d=>d.toISOString().slice(0,10)===todayStr);
+  const todayStr = ymd(now);
+  const todayIdx = days.findIndex(d => ymd(d) === todayStr);
   if (todayIdx === -1) return; // today not in this week
 
   const grid = document.getElementById('cal-grid');
@@ -1944,7 +1937,12 @@ function shake(el){el.style.animation='none';void el.offsetWidth;el.style.animat
 let toastTimer;
 function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2600);}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
-function todayStr2(){return new Date().toISOString().slice(0,10);}
+// Local-time YYYY-MM-DD. toISOString() uses UTC, which shifts the date string
+// for any Date whose local date differs from its UTC date (e.g. local midnight
+// in a negative UTC offset) — we use ymd() everywhere we compare against
+// date-only strings like task.due or session.date.
+function ymd(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
+function todayStr2(){return ymd(new Date());}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function hexToRgba(hex,a){const h=(hex||'').replace('#','');if(h.length!==6)return `rgba(96,125,139,${a})`;const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
 function darkenHex(hex,amt){const h=(hex||'').replace('#','');if(h.length!==6)return hex||'#333';const r=Math.max(0,Math.round(parseInt(h.slice(0,2),16)*(1-amt)));const g=Math.max(0,Math.round(parseInt(h.slice(2,4),16)*(1-amt)));const b=Math.max(0,Math.round(parseInt(h.slice(4,6),16)*(1-amt)));return `rgb(${r},${g},${b})`;}
@@ -2236,7 +2234,7 @@ function gcalShowDisconnected() {
 (function() {
   const today = todayStr2();
   const future = new Date(); future.setDate(future.getDate() + 14);
-  const futureStr = future.toISOString().slice(0,10);
+  const futureStr = ymd(future);
   document.getElementById('gcal-from').value = today;
   document.getElementById('gcal-to').value   = futureStr;
 })();

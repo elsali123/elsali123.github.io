@@ -4,7 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elsa Li — Portfolio</title>
+    <meta name="description" content="Elsa Li — software engineer working on NLP, machine learning, and full-stack tools. Portfolio, projects, and contact.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌱</text></svg>">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Elsa Li — Portfolio">
+    <meta property="og:description" content="Software engineer working on NLP, machine learning, and full-stack tools.">
+    <meta property="og:url" content="https://elsali.dev/">
+    <meta property="og:image" content="https://elsali.dev/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Elsa Li — Portfolio (🌱)">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Elsa Li — Portfolio">
+    <meta name="twitter:description" content="Software engineer working on NLP, machine learning, and full-stack tools.">
+    <meta name="twitter:image" content="https://elsali.dev/og-image.png">
+    <meta name="twitter:image:alt" content="Elsa Li — Portfolio (🌱)">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
     <style>
         :root {
@@ -267,6 +285,28 @@
             color: white;
             border-color: transparent;
             box-shadow: 0 3px 12px rgba(244, 143, 177, 0.4);
+        }
+
+        .nav-links a.nav-icon {
+            padding: 0.35rem;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--blue-mid);
+        }
+        .nav-links a.nav-icon img {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+            display: block;
+        }
+        .nav-links a.nav-icon.linkedin img {
+            filter: brightness(0) invert(1);
+        }
+        .nav-links a.nav-icon:hover {
+            background: var(--blue-deep);
         }
 
         /* ── Header wrapper — collapses via grid rows (no jank) ── */
@@ -711,6 +751,12 @@
             <a class="nav-link" data-page="projects">Projects</a>
             <a class="nav-link" data-page="contact">Contact</a>
             <a class="nav-link" data-page="scheduler">Scheduler</a>
+            <a class="nav-icon" href="https://github.com/elsali123" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">
+                <img src="gitub.png" alt="GitHub">
+            </a>
+            <a class="nav-icon linkedin" href="https://www.linkedin.com/in/elsa-li-hmc/" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">
+                <img src="linkedin.png" alt="LinkedIn">
+            </a>
         </div>
     </nav>
 
@@ -747,19 +793,32 @@
             <section class="section">
                 <h2>Professional Experience</h2>
                 <div class="about-content">
-                    <h3 style="color: #c2185b; margin-top: 0.3rem;">Software Engineer Intern</h3>
+                    <h3 style="color: #c2185b; margin-top: 0.3rem;">Computer Vision Team Lead</h3>
+                    <p style="color: #a695af; margin-bottom: 0.5rem;">American Red Cross | September 2025 - Present</p>
+                    <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <li>Lead a 5-person team building a computer vision detection system using neural networks to identify vulnerable buildings in Indonesia from 360&deg; Mapillary imagery</li>
+                        <li>Benchmarked the model at 75% accuracy</li>
+                    </ul>
+
+                    <h3 style="color: #c2185b; margin-top: 1.5rem;">Software Engineer Intern</h3>
+                    <p style="color: #a695af; margin-bottom: 0.5rem;">Yujun Venture Capital Management | July 2025 - August 2025</p>
+                    <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <li>Built a Selenium web scraper to consolidate public company information, accelerating pre-investment research time by 15%</li>
+                        <li>Applied the scraper to analyze market trends across perfume companies, presenting key findings to the internship team and investors</li>
+                    </ul>
+
+                    <h3 style="color: #c2185b; margin-top: 1.5rem;">Software Engineer Intern</h3>
                     <p style="color: #a695af; margin-bottom: 0.5rem;">The Nature Conservancy | May 2025 - July 2025</p>
                     <ul style="margin-left: 2rem; margin-top: 0.5rem;">
-                        <li>Developed an original RAG-based LLM system using ChromaDB and Qwen to process 2,000+ agroforestry research papers,
-                        reducing year-long process of literature review for domain-specific queries</li>
-                        <li>Created benchmarking dataset of ~7,000 unique questions to test agroforestry RAG systems</li>
-                        <li>Designed regex-based text segmentation system to optimize article preprocessing, reducing token input by 30%</li>
+                        <li>Developed an original RAG-based LLM system using ChromaDB and Qwen to process 2,000+ agroforestry research papers, reducing a year-long literature-review process for domain-specific queries</li>
+                        <li>Created a new benchmarking dataset of ~7,000 unique questions for agroforestry RAG systems</li>
+                        <li>Designed a regex-based text segmentation system to optimize article preprocessing, reducing token input by 30%</li>
                     </ul>
 
                     <h3 style="color: #c2185b; margin-top: 1.5rem;">Software Engineer Intern</h3>
                     <p style="color: #a695af; margin-bottom: 0.5rem;">Shenzhen Lanyang Technology | May 2024 - July 2024</p>
                     <ul style="margin-left: 2rem; margin-top: 0.5rem;">
-                        <li>Patented novel image comparison algorithm with 70% accuracy for fraudulent LPG tank detection using OpenCV</li>
+                        <li>Patented and led development of a novel image-comparison algorithm with 70% accuracy for fraudulent LPG tank detection using Python and OpenCV, preventing the illegal sale of hazardous units</li>
                         <li>Reduced implementation costs by 80%, making safe tank detection accessible to low-income families in China</li>
                     </ul>
                 </div>
@@ -770,14 +829,14 @@
                 <h2> Research Experience</h2>
                 <div class = "about-content">
                     <h3 style="color: #c2185b; margin-top: 0.3rem;">Computer Vision Research Assistant</h3>
-                    <p style="color: #a695af; margin-bottom: 0.5rem;">Workflows for Humanistic Inference of Statistical Knowledge (WHISK) Lab @ Harvey Mudd College | September 2025 - Present</p>
+                    <p style="color: #a695af; margin-bottom: 0.5rem;">Lab for Cognition and Attention in Time and Space (Lab for CATS) @ Harvey Mudd College | September 2025 - Present</p>
                     <ul style="margin-left: 2rem; margin-top: 0.5rem;">
                         <li>Analyzing behavior of visual depth models when applied to forced perception videos</li>
                         <li>Interested in working on monocular depth detection and leveraging adversarial attacks on vision models</li>
                     </ul>
 
                     <h3 style="color: #c2185b; margin-top: 1.5rem;">NLP Research Assistant</h3>
-                    <p style="color: #a695af; margin-bottom: 0.5rem;">Lab for Cognition and Attention in Time and Space (Lab for CATS) @ Harvey Mudd College | January 2025 - May 2025</p>
+                    <p style="color: #a695af; margin-bottom: 0.5rem;">Workflows for Humanistic Inference of Statistical Knowledge (WHISK) Lab @ Harvey Mudd College | January 2025 - May 2025</p>
                     <ul style="margin-left: 2rem; margin-top: 0.5rem;">
                         <li>Implemented supervised ML models (MultinomialNB, ComplementNB, Logistic Regression) to analyze perfume reviews</li>
                         <li>Visualized data using confusion matrices and analyzed precision, recall, and F1 scores</li>
@@ -812,6 +871,28 @@
             <section class="section">
                 <h2>Projects</h2>
                 <div class="projects-grid">
+                    <div class="project-card" onclick="showProject('red-cross-cv')">
+                        <h3>Indonesia Building Vulnerability CV</h3>
+                        <p>Leading a 5-person team building a neural-network detection system that identifies vulnerable buildings in Indonesia from 360&deg; Mapillary imagery — 75% benchmarked accuracy.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Neural Networks</span>
+                            <span class="tag">Computer Vision</span>
+                            <span class="tag">Mapillary</span>
+                        </div>
+                    </div>
+
+                    <div class="project-card" onclick="showProject('yujun-scraper')">
+                        <h3>VC Research Web Scraper</h3>
+                        <p>Selenium scraper that consolidates public-company data for a venture-capital team, accelerating pre-investment research by 15% and surfacing perfume-market trends for an investor presentation.</p>
+                        <div class="tech-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Selenium</span>
+                            <span class="tag">Web Scraping</span>
+                            <span class="tag">Market Analysis</span>
+                        </div>
+                    </div>
+
                     <div class="project-card" onclick="showProject('rag-system')">
                         <h3>Agroforestry RAG System</h3>
                         <p>RAG-based LLM system processing 2,000+ research papers, automating literature review for agroforestry queries.</p>
@@ -836,7 +917,7 @@
 
                     <div class="project-card" onclick="showProject('ecobuddies')">
                         <h3>EcoBuddies</h3>
-                        <p> Won Best Use of Streamlit at Caltech's Hacktech 2025. Web app for setting daily environmental goals</p>
+                        <p>Won Best Use of Streamlit out of 50 teams at Caltech Hacktech — full-stack interactive environmentalism game.</p>
                         <div class="tech-tags">
                             <span class="tag">Python</span>
                             <span class="tag">Streamlit</span>
@@ -846,7 +927,7 @@
 
                     <div class="project-card" onclick="showProject('rainforest-revival')">
                         <h3>Rainforest Revival</h3>
-                        <p> Won Most Unique Game at SEO First Year Academy. Interactive game with 3 mini-games promoting environmental consciousness. </p>
+                        <p>Won Most Unique Game out of 24 teams at SEO First Year Academy Summer Program.</p>
                         <div class="tech-tags">
                             <span class="tag">Python</span>
                             <span class="tag">Pygame</span>
@@ -854,20 +935,91 @@
                         </div>
                     </div>
 
-                    <div class="project-card" onclick="showProject('polygraph')">
-                        <h3>Polygraph Lie Detection</h3>
-                        <p>Multimodal lie detection system using NLP and computer vision sentiment analysis to identify deception in videos.</p>
+                    <div class="project-card" onclick="showProject('digidraw')">
+                        <h3>Digidraw</h3>
+                        <p>Web app for digitally coordinating college room-draw plans. Used by 900+ students at Harvey Mudd to plan housing each year.</p>
                         <div class="tech-tags">
-                            <span class="tag">Python</span>
-                            <span class="tag">NLP</span>
-                            <span class="tag">Computer Vision</span>
-                            <span class="tag">Google Cloud API</span>
+                            <span class="tag">Web App</span>
+                            <span class="tag">Full-Stack</span>
+                            <span class="tag">900+ users</span>
                         </div>
                     </div>
                 </div>
             </section>
 
             
+        </div>
+    </div>
+
+    <!-- Red Cross Computer Vision Project Detail -->
+    <div id="red-cross-cv" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('home')">← Back to Home</a>
+            <section class="section">
+                <h2>Indonesia Building Vulnerability CV</h2>
+                <div class="project-detail">
+                    <p>A computer vision detection system built with the American Red Cross to identify structurally vulnerable buildings in Indonesia using 360&deg; street-level imagery from Mapillary. The model helps humanitarian teams prioritize disaster-preparedness efforts by surfacing at-risk structures at scale.</p>
+
+                    <h3>Organization</h3>
+                    <p style="color: #c2185b; font-weight: 600;">American Red Cross | September 2025 - Present</p>
+
+                    <h3>Role</h3>
+                    <p>Computer Vision Team Lead — leading a 5-person team through data pipeline design, model training, and evaluation.</p>
+
+                    <h3>Key Achievements</h3>
+                    <ul>
+                        <li>Architected and lead a neural-network pipeline for building-vulnerability classification on 360&deg; imagery</li>
+                        <li>Benchmarked the system at 75% accuracy against held-out ground truth</li>
+                        <li>Coordinating a 5-person team across data collection, preprocessing, modeling, and evaluation</li>
+                    </ul>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">Python</span>
+                        <span class="tag">Neural Networks</span>
+                        <span class="tag">Computer Vision</span>
+                        <span class="tag">Mapillary 360&deg;</span>
+                        <span class="tag">PyTorch</span>
+                    </div>
+
+                    <h3>Impact</h3>
+                    <p>The detection system gives the Red Cross a scalable way to survey building stock in at-risk regions of Indonesia — work that would otherwise require extensive ground-truth teams. Identifying vulnerable structures early enables better targeting of retrofits, evacuation planning, and disaster-response resources.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Yujun VC Scraper Project Detail -->
+    <div id="yujun-scraper" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('home')">← Back to Home</a>
+            <section class="section">
+                <h2>VC Research Web Scraper</h2>
+                <div class="project-detail">
+                    <p>A Selenium-based web scraper built for Yujun Venture Capital Management to consolidate public-company information for the firm's pre-investment research process. The tool was also applied to the perfume industry to surface market trends for a pitch to the internship team and investors.</p>
+
+                    <h3>Organization</h3>
+                    <p style="color: #c2185b; font-weight: 600;">Yujun Venture Capital Management | July 2025 - August 2025</p>
+
+                    <h3>Key Achievements</h3>
+                    <ul>
+                        <li>Built a Selenium scraper consolidating public-company information across multiple sources</li>
+                        <li>Accelerated pre-investment research time by 15%</li>
+                        <li>Analyzed market trends across perfume companies and delivered key findings in a final presentation to the team and investors</li>
+                    </ul>
+
+                    <h3>Technologies Used</h3>
+                    <div class="tech-tags">
+                        <span class="tag">Python</span>
+                        <span class="tag">Selenium</span>
+                        <span class="tag">Web Scraping</span>
+                        <span class="tag">Data Analysis</span>
+                    </div>
+
+                    <h3>Impact</h3>
+                    <p>Replaced a manual information-gathering workflow with an automated pipeline, freeing analysts to focus on interpretation instead of collection. The perfume-market analysis demonstrated the scraper's applicability to thesis-driven research and informed the firm's discussion of that sector.</p>
+                </div>
+            </section>
         </div>
     </div>
 
@@ -1038,6 +1190,45 @@
 
                     <h3>Why "Most Unique"</h3>
                     <p>The project earned the Most Unique Game award for its innovative combination of traditional 2D gaming with advanced AI conversation capabilities. The seamless integration of an LLM-powered chatbot into a Pygame environment was particularly noteworthy.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Digidraw Project Detail -->
+    <div id="digidraw" class="page">
+        <div class="container">
+            <a class="back-button" onclick="showPage('home')">← Back to Home</a>
+            <section class="section">
+                <h2>Digidraw</h2>
+                <div class="project-detail">
+                    <p>Digidraw is a web application that digitally coordinates the annual room-draw (housing selection) process at Harvey Mudd College. It replaces an error-prone paper-and-whiteboard workflow with a shared interface where students can plan, preview, and finalize their room picks in real time.</p>
+
+                    <h3>Scale</h3>
+                    <p style="color: #c2185b; font-weight: 600;">Used by 900+ students</p>
+
+                    <h3>Repository</h3>
+                    <p><a href="https://github.com/tomqlam/roomdraw" target="_blank" rel="noopener" style="color:#c2185b;font-weight:600">github.com/tomqlam/roomdraw ↗</a></p>
+
+                    <h3>What It Does</h3>
+                    <ul>
+                        <li>Lets students visualize every dorm and open room during the draw</li>
+                        <li>Coordinates pick order so multiple students can plan against the same live state</li>
+                        <li>Reduces miscommunication and last-minute conflicts compared to the legacy manual process</li>
+                    </ul>
+
+                    <h3>Tech Stack</h3>
+                    <ul>
+                        <li><strong>Frontend:</strong> React (JavaScript)</li>
+                        <li><strong>Backend:</strong> Go with the Gin web framework, containerized with Docker/Podman</li>
+                        <li><strong>Database:</strong> PostgreSQL storing suites, users, rooms, and a transaction log for auditability</li>
+                        <li><strong>Authentication:</strong> Google OAuth</li>
+                        <li><strong>External services:</strong> BunnyNet CDN for suite-design image hosting, SMTP for email notifications</li>
+                        <li><strong>Tooling:</strong> Python + Jupyter notebooks for DB seeding and test data, rate-limiting and request-queuing middleware to handle draw-day load</li>
+                    </ul>
+
+                    <h3>Impact</h3>
+                    <p>Adopted campus-wide, Digidraw has become the standard tool students use during room draw each year — streamlining a high-stakes event that previously depended on in-person coordination and shared spreadsheets.</p>
                 </div>
             </section>
         </div>
