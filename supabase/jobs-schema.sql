@@ -69,6 +69,13 @@ drop policy if exists "jobs readable by authed" on job_postings;
 create policy "jobs readable by authed" on job_postings
   for select to authenticated using (true);
 
+-- Users may add jobs by pasting a link in the dashboard (source='manual'
+-- only — scraper sources stay service-role-only).
+drop policy if exists "manual jobs insert" on job_postings;
+create policy "manual jobs insert" on job_postings
+  for insert to authenticated
+  with check (source = 'manual');
+
 -- Users manage only their own applications and profile.
 drop policy if exists "own applications" on applications;
 create policy "own applications" on applications

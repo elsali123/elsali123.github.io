@@ -102,6 +102,16 @@
         ⚠️ Complete your <a href="#" onclick="showTab('profile');return false">profile</a> and upload a resume
         before queueing applications — the bot will fail them otherwise.
       </div>
+      <div class="card">
+        <b>Apply to a link directly</b>
+        <div class="meta" style="margin:2px 0 8px">Paste any application URL. Greenhouse / Lever / Ashby links get auto-submitted like feed jobs; other sites are tracked and flagged for manual finishing.</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <input id="manualUrl" placeholder="https://boards.greenhouse.io/company/jobs/123…" style="flex:2; min-width:240px">
+          <input id="manualCompany" placeholder="Company (optional)" style="flex:1; min-width:120px">
+          <input id="manualTitle" placeholder="Job title (optional)" style="flex:1; min-width:120px">
+          <button class="primary" id="manualBtn" onclick="addManualJob()">Add &amp; queue</button>
+        </div>
+      </div>
       <div class="filters">
         <input type="search" id="fSearch" placeholder="Search company or title…" oninput="renderJobs()">
         <select id="fTerm" onchange="renderJobs()">
@@ -297,6 +307,89 @@ async function queueApply(jobId, btn) {
   const { data } = await sb.from('applications').select('*, job:job_postings(company,title,url,term)')
     .order('created_at', { ascending: false });
   apps = data || []; renderApps();
+}
+
+// ---------- manual "apply to a link" ----------
+function detectAtsFromUrl(u) {
+  u = u.toLowerCase();
+  if (u.includes('greenhouse.io')) return 'greenhouse';
+  if (u.includes('lever.co')) return 'lever';
+  if (u.includes('ashbyhq.com')) return 'ashby';
+  if (u.includes('myworkdayjobs.com')) return 'workday';
+  return 'other';
+}
+
+// Best-effort company/title lookup from the free public ATS APIs.
+async function fetchJobMeta(url, ats) {
+  try {
+    if (ats === 'greenhouse') {
+      const m = url.match(/greenhouse\.io\/(?:embed\/job_app\?.*token=)?([^/?#]+)\/jobs\/(\d+)/i);
+      if (!m) return {};
+      const r = await fetch(`https://boards-api.greenhouse.io/v1/boards/${m[1]}/jobs/${m[2]}`);
+      if (!r.ok) return { company: m[1] };
+      const j = await r.json();
+      return { company: m[1], title: j.title, locations: j.location?.name };
+    }
+    if (ats === 'lever') {
+      const m = url.match(/jobs\.lever\.co\/([^/?#]+)\/([0-9a-f-]{36})/i);
+      if (!m) return {};
+      const r = await fetch(`https://api.lever.co/v0/postings/${m[1]}/${m[2]}`);
+      if (!r.ok) return { company: m[1] };
+      const j = await r.json();
+      return { company: m[1], title: j.text, locations: j.categories?.location };
+    }
+    if (ats === 'ashby') {
+      const m = url.match(/jobs\.ashbyhq\.com\/([^/?#]+)\/([0-9a-f-]{36})/i);
+      if (!m) return {};
+      const r = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${m[1]}`);
+      if (!r.ok) return { company: m[1] };
+      const j = await r.json();
+      const job = (j.jobs || []).find(x => x.id === m[2]);
+      return { company: m[1], title: job?.title, locations: job?.location };
+    }
+  } catch (e) { console.warn('meta fetch failed:', e); }
+  return {};
+}
+
+async function addManualJob() {
+  if (!profile?.resume_path || !profile?.full_name) {
+    toast('Complete your profile + resume first ⚠️'); showTab('profile'); return;
+  }
+  let url = $('manualUrl').value.trim();
+  if (!/^https?:\/\/\S+$/i.test(url)) { toast('Paste a valid http(s) link'); return; }
+  const btn = $('manualBtn'); btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    const norm = url.replace(/[#].*$/, '').replace(/\/$/, '');
+    const ats = detectAtsFromUrl(norm);
+    // Reuse an existing row (scraped or previously pasted) if the URL matches.
+    let { data: existing } = await sbFindByUrl(norm);
+    let jobId = existing?.id;
+    if (!jobId) {
+      const meta = await fetchJobMeta(norm, ats);
+      const company = $('manualCompany').value.trim() || meta.company || new URL(norm).hostname.replace(/^www\./, '');
+      const title = $('manualTitle').value.trim() || meta.title || 'Pasted application';
+      const { data, error } = await sb.from('job_postings').insert({
+        source: 'manual', ats, external_id: norm, company, title,
+        locations: meta.locations || null, url: norm, term: 'Unspecified',
+      }).select('id').single();
+      if (error) throw error;
+      jobId = data.id;
+    }
+    const { error: aErr } = await sb.from('applications').insert({ user_id: user.id, job_id: jobId });
+    if (aErr) throw aErr.code === '23505' ? new Error('Already queued for this link') : aErr;
+    $('manualUrl').value = ''; $('manualCompany').value = ''; $('manualTitle').value = '';
+    toast(ats === 'greenhouse' || ats === 'lever' || ats === 'ashby'
+      ? 'Queued — the bot picks it up within ~20 min 🚀'
+      : `Queued — ${ats} isn't auto-submittable, it'll be flagged for manual finishing 👀`);
+    loadAll();
+  } catch (e) {
+    toast('Failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Add & queue';
+  }
+}
+async function sbFindByUrl(norm) {
+  return sb.from('job_postings').select('id').eq('url', norm).limit(1).maybeSingle();
 }
 
 // ---------- applications tab ----------
