@@ -44,6 +44,17 @@ if (deduped.length) {
   const { error } = await sb.from('job_postings').upsert(deduped, { onConflict: 'source,external_id' });
   if (error) throw error;
 }
+// Purge any stored rows that fail the US filter (covers rows scraped
+// before the filter existed, and future filter tightening).
+const { data: stored, error: stErr } = await sb.from('job_postings').select('id, locations');
+if (stErr) throw stErr;
+const nonUS = (stored || []).filter((r) => !isUSLocation(r.locations)).map((r) => r.id);
+for (let i = 0; i < nonUS.length; i += 100) {
+  const { error } = await sb.from('job_postings').delete().in('id', nonUS.slice(i, i + 100));
+  if (error) throw error;
+}
+if (nonUS.length) console.log(`Purged ${nonUS.length} non-US postings`);
+
 const { data: fresh, error: freshErr } = await sb
   .from('job_postings')
   .select('company, title, url, term, locations')
