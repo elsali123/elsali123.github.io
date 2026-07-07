@@ -4,3 +4,4 @@ password.txt
 resume.txt
 automation/node_modules/
 automation/failure-*.png
+automation/.env.local

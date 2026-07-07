@@ -12,6 +12,11 @@ import { env, sendEmail, esc } from './lib/util.mjs';
 
 const MAX_PER_RUN = Number(process.env.MAX_APPLICATIONS_PER_RUN || 8);
 const SUPPORTED_ATS = new Set(['greenhouse', 'lever', 'ashby']);
+// DRY_RUN=1: fill forms but never submit, never change statuses, no email.
+// HEADED=1: visible browser (for watching locally), slowed down a touch.
+const DRY_RUN = process.env.DRY_RUN === '1';
+const HEADED = process.env.HEADED === '1';
+if (DRY_RUN) console.log('🧪 DRY RUN — nothing will be submitted or written back');
 
 const sb = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false },
@@ -28,6 +33,7 @@ if (!queue?.length) { console.log('Queue empty — nothing to do.'); process.exi
 console.log(`Processing ${queue.length} queued application(s)`);
 
 async function setStatus(id, status, detail, answers) {
+  if (DRY_RUN) return;
   const { error } = await sb.from('applications')
     .update({ status, detail: detail?.slice(0, 500) ?? null, answers: answers ?? null, updated_at: new Date().toISOString() })
     .eq('id', id);
@@ -73,7 +79,7 @@ async function getProfile(userId) {
 }
 
 // ---- Work the queue ----
-const browser = await chromium.launch();
+const browser = await chromium.launch({ headless: !HEADED, slowMo: HEADED ? 120 : 0 });
 const results = [];
 for (const app of queue) {
   const job = app.job;
@@ -96,10 +102,18 @@ for (const app of queue) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1600 } });
   const page = await ctx.newPage();
   try {
-    const r = await fillAndSubmit(page, job, entry.profile, entry.files);
+    const r = await fillAndSubmit(page, job, entry.profile, entry.files, { dryRun: DRY_RUN });
     await setStatus(app.id, r.status, r.detail, r.answers);
     results.push({ tag, ...r, url: job.url });
     console.log(`  → ${r.status}: ${r.detail}`);
+    if (DRY_RUN) {
+      console.log('  Answers used:');
+      for (const [q, a] of Object.entries(r.answers)) console.log(`    • ${q} → ${a}`);
+      if (HEADED) {
+        console.log('  Browser stays open 60s so you can inspect the filled form…');
+        await page.waitForTimeout(60000);
+      }
+    }
   } catch (e) {
     await page.screenshot({ path: `failure-${app.id}.png`, fullPage: true }).catch(() => {});
     await setStatus(app.id, 'failed', e.message);
@@ -112,6 +126,7 @@ for (const app of queue) {
 await browser.close();
 
 // ---- Status email ----
+if (DRY_RUN) { console.log('\n🧪 DRY RUN complete — no statuses changed, no email sent.'); process.exit(0); }
 const icon = { submitted: '✅', needs_review: '👀', failed: '❌' };
 const items = results.map((r) =>
   `<li>${icon[r.status] || '•'} <b>${esc(r.tag)}</b> — ${esc(r.status)}: ${esc(r.detail)}` +

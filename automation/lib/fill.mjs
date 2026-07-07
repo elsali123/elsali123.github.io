@@ -109,7 +109,7 @@ async function gotoForm(page, job) {
   await page.waitForSelector('input, textarea, select', { timeout: 15000 });
 }
 
-export async function fillAndSubmit(page, job, profile, files) {
+export async function fillAndSubmit(page, job, profile, files, opts = {}) {
   const answers = {};
   await gotoForm(page, job);
 
@@ -189,6 +189,9 @@ export async function fillAndSubmit(page, job, profile, files) {
 
   if (await hasCaptcha(page)) {
     return { status: 'needs_review', detail: 'CAPTCHA appeared before submit — apply manually', answers };
+  }
+  if (opts.dryRun) {
+    return { status: 'dry_run', detail: 'DRY RUN — form filled, nothing submitted', answers };
   }
   if (profile.auto_submit === false) {
     return { status: 'needs_review', detail: 'Auto-submit disabled in profile; form was validated but not sent', answers };
