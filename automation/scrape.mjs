@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSimplify, fetchGreenhouse, fetchLever, fetchAshby } from './lib/sources.mjs';
-import { env, sendEmail, esc } from './lib/util.mjs';
+import { env, sendEmail, esc, isUSLocation } from './lib/util.mjs';
 
 const DASHBOARD_URL = 'https://elsali.dev/jobs.html';
 
@@ -19,8 +19,12 @@ const results = await Promise.allSettled([
   fetchLever(companies.lever || []),
   fetchAshby(companies.ashby || []),
 ]);
-const rows = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+const allRows = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
 for (const r of results) if (r.status === 'rejected') console.warn('source failed:', r.reason);
+
+// US internships only.
+const rows = allRows.filter((r) => isUSLocation(r.locations));
+console.log(`US filter: ${allRows.length} → ${rows.length} rows`);
 
 // Dedupe within this run (same job can appear via Simplify AND the direct API;
 // prefer the direct-API row since its external_id is stabler).

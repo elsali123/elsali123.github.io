@@ -21,6 +21,38 @@ export function classifyPosting(title, extraText = '') {
   return 'Unspecified';
 }
 
+// ---------- US-only location filter ----------
+const US_POSITIVE = new RegExp(
+  '\\b(united states|usa|u\\.s\\.|us[- ]?remote|remote[- ](in[- ])?(the[- ])?us)\\b|' +
+  // "City, ST" with a US state/territory abbreviation
+  ',\\s*(A[LKZR]|C[AOT]|D[EC]|FL|GA|HI|I[DLNA]|K[SY]|LA|M[EDAINSOT]|N[EVHJMYCD]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[TA]|W[AVIY]|PR)\\b|' +
+  '\\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming)\\b|' +
+  // common US city names/abbreviations that appear without a state
+  '\\b(sf|nyc|bay area|silicon valley|san francisco|new york city|los angeles|palo alto|mountain view|menlo park|santa clara|san jose|sunnyvale|cupertino|redwood city|seattle|bellevue|redmond|austin|chicago|boston|denver|atlanta|dallas|houston|miami|philadelphia|pittsburgh|washington,? d\\.?c\\.?)\\b',
+  'i');
+const US_NEGATIVE = new RegExp(
+  '\\b(canada|ontario|toronto|vancouver|montreal|waterloo|calgary|ottawa|' +
+  'united kingdom|uk|london|cambridge uk|england|scotland|ireland|dublin|' +
+  'germany|berlin|munich|france|paris|netherlands|amsterdam|belgium|spain|madrid|barcelona|' +
+  'italy|milan|sweden|stockholm|switzerland|zurich|geneva|poland|warsaw|krakow|' +
+  'india|bangalore|bengaluru|hyderabad|mumbai|delhi|pune|chennai|gurgaon|noida|' +
+  'singapore|japan|tokyo|china|shanghai|beijing|hong kong|taiwan|taipei|korea|seoul|' +
+  'australia|sydney|melbourne|new zealand|israel|tel aviv|brazil|sao paulo|' +
+  'mexico city|argentina|colombia|dubai|uae|saudi|nigeria|south africa|kenya|egypt|emea|apac|latam)\\b',
+  'i');
+
+// True if any listed location looks like the US; locations with no signal
+// either way (e.g. bare "Remote" or "San Francisco") are kept.
+export function isUSLocation(locations) {
+  if (!locations) return true;
+  const judged = String(locations).split(/[;|•]/).map((part) => {
+    if (US_POSITIVE.test(part)) return true;
+    if (US_NEGATIVE.test(part)) return false;
+    return null;
+  });
+  return judged.includes(true) || !judged.includes(false);
+}
+
 export function detectAts(url) {
   const u = (url || '').toLowerCase();
   if (u.includes('greenhouse.io')) return 'greenhouse';
