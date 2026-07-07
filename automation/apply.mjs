@@ -1,0 +1,123 @@
+// Auto-apply worker: picks up queued applications from Supabase, fills and
+// submits each with Playwright, emails a status summary.
+// Run by .github/workflows/auto-apply.yml every 20 minutes.
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createClient } from '@supabase/supabase-js';
+import { chromium } from 'playwright';
+import { extractText, getDocumentProxy } from 'unpdf';
+import { fillAndSubmit } from './lib/fill.mjs';
+import { env, sendEmail, esc } from './lib/util.mjs';
+
+const MAX_PER_RUN = Number(process.env.MAX_APPLICATIONS_PER_RUN || 8);
+const SUPPORTED_ATS = new Set(['greenhouse', 'lever', 'ashby']);
+
+const sb = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
+  auth: { persistSession: false },
+});
+
+const { data: queue, error: qErr } = await sb
+  .from('applications')
+  .select('*, job:job_postings(*)')
+  .eq('status', 'queued')
+  .order('created_at')
+  .limit(MAX_PER_RUN);
+if (qErr) throw qErr;
+if (!queue?.length) { console.log('Queue empty — nothing to do.'); process.exit(0); }
+console.log(`Processing ${queue.length} queued application(s)`);
+
+async function setStatus(id, status, detail, answers) {
+  const { error } = await sb.from('applications')
+    .update({ status, detail: detail?.slice(0, 500) ?? null, answers: answers ?? null, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) console.warn('status update failed:', error.message);
+}
+
+// ---- Load profiles + docs per user (usually just one user) ----
+const profiles = new Map();
+async function getProfile(userId) {
+  if (profiles.has(userId)) return profiles.get(userId);
+  const { data: p, error } = await sb.from('job_profile').select('*').eq('user_id', userId).single();
+  if (error || !p) { profiles.set(userId, null); return null; }
+  if (!p.resume_path) { profiles.set(userId, null); return null; }
+
+  const dir = await mkdtemp(join(tmpdir(), 'apply-'));
+  const dl = async (path, name) => {
+    const { data, error: e } = await sb.storage.from('job-docs').download(path);
+    if (e) throw new Error(`download ${path}: ${e.message}`);
+    const file = join(dir, name);
+    await writeFile(file, Buffer.from(await data.arrayBuffer()));
+    return file;
+  };
+  const files = { resume: await dl(p.resume_path, 'resume.pdf') };
+  if (p.transcript_path) {
+    try { files.transcript = await dl(p.transcript_path, 'transcript.pdf'); }
+    catch (e) { console.warn(e.message); }
+  }
+
+  // Extract resume text once for LLM context, persist for future runs.
+  if (!p.resume_text) {
+    try {
+      const buf = await (await sb.storage.from('job-docs').download(p.resume_path)).data.arrayBuffer();
+      const pdf = await getDocumentProxy(new Uint8Array(buf));
+      const { text } = await extractText(pdf, { mergePages: true });
+      p.resume_text = text.slice(0, 15000);
+      await sb.from('job_profile').update({ resume_text: p.resume_text }).eq('user_id', userId);
+    } catch (e) { console.warn('resume text extraction failed:', e.message); }
+  }
+
+  const entry = { profile: p, files };
+  profiles.set(userId, entry);
+  return entry;
+}
+
+// ---- Work the queue ----
+const browser = await chromium.launch();
+const results = [];
+for (const app of queue) {
+  const job = app.job;
+  const tag = `${job.company} — ${job.title}`;
+  console.log(`\n▶ ${tag} (${job.ats})`);
+  await setStatus(app.id, 'applying');
+
+  const entry = await getProfile(app.user_id).catch((e) => { console.warn(e.message); return null; });
+  if (!entry) {
+    await setStatus(app.id, 'failed', 'Profile incomplete — set your info and upload a resume on the dashboard first');
+    results.push({ tag, status: 'failed', detail: 'profile incomplete' });
+    continue;
+  }
+  if (!SUPPORTED_ATS.has(job.ats)) {
+    await setStatus(app.id, 'needs_review', `Unsupported ATS (${job.ats}) — apply manually: ${job.url}`);
+    results.push({ tag, status: 'needs_review', detail: `unsupported ATS ${job.ats}`, url: job.url });
+    continue;
+  }
+
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1600 } });
+  const page = await ctx.newPage();
+  try {
+    const r = await fillAndSubmit(page, job, entry.profile, entry.files);
+    await setStatus(app.id, r.status, r.detail, r.answers);
+    results.push({ tag, ...r, url: job.url });
+    console.log(`  → ${r.status}: ${r.detail}`);
+  } catch (e) {
+    await page.screenshot({ path: `failure-${app.id}.png`, fullPage: true }).catch(() => {});
+    await setStatus(app.id, 'failed', e.message);
+    results.push({ tag, status: 'failed', detail: e.message, url: job.url });
+    console.warn(`  → failed: ${e.message}`);
+  } finally {
+    await ctx.close();
+  }
+}
+await browser.close();
+
+// ---- Status email ----
+const icon = { submitted: '✅', needs_review: '👀', failed: '❌' };
+const items = results.map((r) =>
+  `<li>${icon[r.status] || '•'} <b>${esc(r.tag)}</b> — ${esc(r.status)}: ${esc(r.detail)}` +
+  (r.url && r.status !== 'submitted' ? ` (<a href="${esc(r.url)}">open</a>)` : '') + '</li>').join('\n');
+const submitted = results.filter((r) => r.status === 'submitted').length;
+await sendEmail(
+  `📨 Auto-apply run: ${submitted}/${results.length} submitted`,
+  `<ul>${items}</ul><p><a href="https://elsali.dev/jobs.html">Dashboard</a></p>`
+);

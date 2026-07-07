@@ -1,0 +1,57 @@
+name: Auto-apply worker
+
+on:
+  schedule:
+    - cron: '17,37,57 * * * *'   # every 20 min, offset from the scraper
+  workflow_dispatch: {}
+
+concurrency:
+  group: auto-apply
+  cancel-in-progress: false
+
+jobs:
+  # Cheap pre-check so the heavy Playwright job only runs when there's work.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      queued: ${{ steps.q.outputs.queued }}
+    steps:
+      - id: q
+        run: |
+          COUNT=$(curl -sf "${{ secrets.SUPABASE_URL }}/rest/v1/applications?status=eq.queued&select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" | jq 'length')
+          echo "queued=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Queued applications (0/1+): $COUNT"
+
+  apply:
+    needs: check
+    if: needs.check.outputs.queued != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: automation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: node apply.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          DIGEST_EMAIL: ${{ secrets.DIGEST_EMAIL }}
+      - name: Upload failure screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots
+          path: automation/failure-*.png
+          if-no-files-found: ignore

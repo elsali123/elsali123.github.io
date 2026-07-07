@@ -2,3 +2,5 @@ image copy.png
 image.png
 password.txt
 resume.txt
+automation/node_modules/
+automation/failure-*.png

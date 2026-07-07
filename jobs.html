@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Auto-Apply · elsali.dev</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #e6edf3;
+    --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; --yellow: #d29922;
+    --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .spacer { flex: 1; }
+  main { max-width: 1000px; margin: 0 auto; padding: 20px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 18px; }
+  .tab { padding: 7px 16px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--muted); cursor: pointer; font-size: 14px; }
+  .tab.active { color: var(--text); border-color: var(--accent); }
+  .tab .badge { background: var(--accent); color: #000; border-radius: 10px;
+    padding: 0 7px; font-size: 12px; margin-left: 6px; }
+  .card { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  button.primary { background: var(--accent); color: #06131f; border: 0; border-radius: 8px;
+    padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 14px; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 13px; }
+  button:disabled { opacity: .45; cursor: default; }
+  input, select, textarea { background: #0d1117; color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 14px; width: 100%; font-family: inherit; }
+  textarea { resize: vertical; }
+  label { font-size: 12.5px; color: var(--muted); display: block; margin: 10px 0 4px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 14px; }
+  .job { display: flex; gap: 12px; align-items: flex-start; }
+  .job .info { flex: 1; min-width: 0; }
+  .job h3 { margin: 0 0 2px; font-size: 15px; }
+  .job h3 a { color: var(--text); text-decoration: none; }
+  .job h3 a:hover { color: var(--accent); }
+  .meta { font-size: 12.5px; color: var(--muted); }
+  .chip { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 10px;
+    border: 1px solid var(--border); color: var(--muted); margin-right: 5px; }
+  .chip.new { color: var(--green); border-color: var(--green); }
+  .status { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+  .status.queued       { background: #1c2d41; color: var(--accent); }
+  .status.applying     { background: #2d2a1c; color: var(--yellow); }
+  .status.submitted    { background: #1c2f22; color: var(--green); }
+  .status.needs_review { background: #2d2a1c; color: var(--yellow); }
+  .status.failed       { background: #3b1d1f; color: var(--red); }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filters input, .filters select { width: auto; }
+  .filters input[type="search"] { flex: 1; min-width: 160px; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  .qa { display: grid; grid-template-columns: 1fr 1fr 34px; gap: 8px; margin-bottom: 8px; }
+  .detail { font-size: 12.5px; color: var(--muted); margin-top: 6px; white-space: pre-wrap; }
+  .answers { font-size: 12.5px; margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 8px; }
+  .answers dt { color: var(--muted); }
+  .answers dd { margin: 0 0 6px; }
+  .doc-ok { color: var(--green); font-size: 13px; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--border); padding: 10px 20px;
+    border-radius: 10px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 20; }
+  #toast.show { opacity: 1; }
+  .signin { text-align: center; padding: 80px 20px; }
+  .switch { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 14px; }
+  .note { font-size: 12.5px; color: var(--muted); background: #10161d; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧑‍💻 Auto-Apply</h1>
+  <span class="meta">internships · Winter 2026 &amp; Summer 2027</span>
+  <div class="spacer"></div>
+  <span id="userEmail" class="meta"></span>
+  <button class="ghost" id="authBtn" onclick="signIn()">Sign in with Google</button>
+</header>
+
+<main>
+  <div id="signinView" class="signin card" style="display:none">
+    <h2>Sign in to manage your applications</h2>
+    <p class="meta">Job feed updates hourly. Queue a job and the bot applies for you within ~20 minutes.</p>
+    <button class="primary" onclick="signIn()">Sign in with Google</button>
+  </div>
+
+  <div id="appView" style="display:none">
+    <div class="tabs">
+      <div class="tab active" data-tab="jobs" onclick="showTab('jobs')">Jobs <span id="jobCount" class="badge">0</span></div>
+      <div class="tab" data-tab="apps" onclick="showTab('apps')">My Applications <span id="appCount" class="badge">0</span></div>
+      <div class="tab" data-tab="profile" onclick="showTab('profile')">Profile</div>
+    </div>
+
+    <!-- ============ JOBS TAB ============ -->
+    <section id="tab-jobs">
+      <div id="profileWarning" class="note" style="display:none">
+        ⚠️ Complete your <a href="#" onclick="showTab('profile');return false">profile</a> and upload a resume
+        before queueing applications — the bot will fail them otherwise.
+      </div>
+      <div class="filters">
+        <input type="search" id="fSearch" placeholder="Search company or title…" oninput="renderJobs()">
+        <select id="fTerm" onchange="renderJobs()">
+          <option value="">All terms</option>
+          <option>Winter 2026</option>
+          <option>Summer 2027</option>
+          <option>Unspecified</option>
+        </select>
+        <select id="fAge" onchange="renderJobs()">
+          <option value="">Any age</option>
+          <option value="1">Last 24h</option>
+          <option value="7">Last 7 days</option>
+        </select>
+        <label class="switch" style="margin:0"><input type="checkbox" id="fHideApplied" onchange="renderJobs()" style="width:auto"> hide queued/applied</label>
+      </div>
+      <div id="jobList"></div>
+    </section>
+
+    <!-- ============ APPLICATIONS TAB ============ -->
+    <section id="tab-apps" style="display:none">
+      <div class="note">✅ submitted &nbsp;·&nbsp; 👀 needs review (CAPTCHA / unsupported site / no confirmation — finish manually)
+        &nbsp;·&nbsp; ❌ failed (fix profile or retry)</div>
+      <div id="appList"></div>
+    </section>
+
+    <!-- ============ PROFILE TAB ============ -->
+    <section id="tab-profile" style="display:none">
+      <div class="card">
+        <h3 style="margin-top:0">Documents</h3>
+        <div class="row">
+          <div>
+            <label>Resume (PDF, required)</label>
+            <input type="file" id="resumeFile" accept="application/pdf">
+            <div id="resumeStatus" class="meta"></div>
+          </div>
+          <div>
+            <label>Transcript (PDF, optional)</label>
+            <input type="file" id="transcriptFile" accept="application/pdf">
+            <div id="transcriptStatus" class="meta"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Contact &amp; standard fields</h3>
+        <div class="row">
+          <div><label>Full name</label><input id="p_full_name"></div>
+          <div><label>Email</label><input id="p_email" type="email"></div>
+          <div><label>Phone</label><input id="p_phone"></div>
+          <div><label>Location (city, state)</label><input id="p_location"></div>
+          <div><label>LinkedIn URL</label><input id="p_linkedin"></div>
+          <div><label>GitHub URL</label><input id="p_github"></div>
+          <div><label>Personal website</label><input id="p_website"></div>
+          <div><label>School</label><input id="p_school"></div>
+          <div><label>Degree (e.g. Bachelor's)</label><input id="p_degree"></div>
+          <div><label>Major</label><input id="p_major"></div>
+          <div><label>Expected graduation (e.g. May 2028)</label><input id="p_grad_date"></div>
+          <div><label>GPA</label><input id="p_gpa"></div>
+          <div><label>Work authorization (e.g. "Authorized to work in the US")</label><input id="p_work_auth"></div>
+          <div><label>Need sponsorship? </label>
+            <select id="p_needs_sponsorship"><option value=""></option><option>No</option><option>Yes</option></select></div>
+          <div><label>Gender (for EEO questions)</label><input id="p_gender"></div>
+          <div><label>Race / ethnicity (for EEO questions)</label><input id="p_race"></div>
+          <div><label>Veteran status</label><input id="p_veteran" placeholder="I am not a protected veteran"></div>
+          <div><label>Disability status</label><input id="p_disability" placeholder="No, I do not have a disability"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Saved answers to common questions</h3>
+        <p class="meta" style="margin-top:-6px">Matched by question text. Anything not covered here gets answered by the AI using your resume + context below.</p>
+        <div id="qaList"></div>
+        <button class="ghost" onclick="addQaRow('','')">+ add question</button>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Extra context for the AI</h3>
+        <label>Projects, interests, why-this-company angles, anything the AI should know when writing answers</label>
+        <textarea id="p_extra_context" rows="5"></textarea>
+        <div class="switch">
+          <input type="checkbox" id="p_auto_submit" style="width:auto" checked>
+          <span>Auto-submit applications (uncheck to have the bot fill &amp; flag for review without sending)</span>
+        </div>
+        <br>
+        <button class="primary" onclick="saveProfile()">Save profile</button>
+        <span id="saveStatus" class="meta"></span>
+      </div>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://zyfzgezjusyfxmfuhvfk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_rpF1rLZ3Hrgjn4mPRILLCg_RmUf6C6n';
+
+let sb, user = null, jobs = [], apps = [], profile = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ---------- auth ----------
+function init() {
+  if (typeof supabase === 'undefined') { setTimeout(init, 400); return; }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
+  sb.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null));
+}
+function signIn() {
+  sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } })
+    .catch(e => toast('Sign-in failed: ' + e.message));
+}
+function signOut() { sb.auth.signOut(); }
+function setUser(u) {
+  const changed = (u?.id !== user?.id);
+  user = u;
+  $('signinView').style.display = u ? 'none' : 'block';
+  $('appView').style.display = u ? 'block' : 'none';
+  $('userEmail').textContent = u?.email || '';
+  const b = $('authBtn');
+  b.textContent = u ? 'Sign out' : 'Sign in with Google';
+  b.onclick = u ? signOut : signIn;
+  if (u && changed) loadAll();
+}
+
+// ---------- data ----------
+async function loadAll() {
+  const since = new Date(Date.now() - 45 * 864e5).toISOString(); // feed = last 45 days
+  const [j, a, p] = await Promise.all([
+    sb.from('job_postings').select('*').eq('active', true).gte('first_seen', since)
+      .order('first_seen', { ascending: false }).limit(1000),
+    sb.from('applications').select('*, job:job_postings(company,title,url,term)')
+      .order('created_at', { ascending: false }),
+    sb.from('job_profile').select('*').eq('user_id', user.id).maybeSingle(),
+  ]);
+  if (j.error || a.error || p.error) { toast('Load failed: ' + (j.error||a.error||p.error).message); return; }
+  jobs = j.data || []; apps = a.data || []; profile = p.data;
+  renderJobs(); renderApps(); fillProfileForm();
+  $('profileWarning').style.display = (profile?.resume_path && profile?.full_name) ? 'none' : 'block';
+}
+
+// ---------- jobs tab ----------
+function renderJobs() {
+  const q = $('fSearch').value.toLowerCase();
+  const term = $('fTerm').value;
+  const age = $('fAge').value;
+  const hide = $('fHideApplied').checked;
+  const appliedJobIds = new Set(apps.map(a => a.job_id));
+  const cutoff = age ? Date.now() - Number(age) * 864e5 : 0;
+  const dayAgo = Date.now() - 864e5;
+
+  const list = jobs.filter(j =>
+    (!q || (j.company + ' ' + j.title).toLowerCase().includes(q)) &&
+    (!term || j.term === term) &&
+    (!cutoff || new Date(j.first_seen).getTime() > cutoff) &&
+    (!hide || !appliedJobIds.has(j.id)));
+
+  $('jobCount').textContent = list.length;
+  $('jobList').innerHTML = list.length ? list.map(j => {
+    const isNew = new Date(j.first_seen).getTime() > dayAgo;
+    const queued = appliedJobIds.has(j.id);
+    return `<div class="card job">
+      <div class="info">
+        <h3><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.company)} — ${esc(j.title)}</a></h3>
+        <div class="meta">
+          ${isNew ? '<span class="chip new">new</span>' : ''}
+          <span class="chip">${esc(j.term)}</span>
+          <span class="chip">${esc(j.ats)}</span>
+          ${j.locations ? `<span class="chip">${esc(j.locations.slice(0, 60))}</span>` : ''}
+          <span>seen ${new Date(j.first_seen).toLocaleDateString()}</span>
+        </div>
+      </div>
+      <button class="primary" ${queued ? 'disabled' : ''} onclick="queueApply('${j.id}', this)">
+        ${queued ? 'Queued ✓' : 'Apply'}</button>
+    </div>`;
+  }).join('') : '<div class="empty">No jobs match — the scraper runs hourly, check back soon.</div>';
+}
+
+async function queueApply(jobId, btn) {
+  if (!profile?.resume_path || !profile?.full_name) {
+    toast('Complete your profile + resume first ⚠️'); showTab('profile'); return;
+  }
+  btn.disabled = true;
+  const { error } = await sb.from('applications').insert({ user_id: user.id, job_id: jobId });
+  if (error) { btn.disabled = false; toast('Failed: ' + error.message); return; }
+  btn.textContent = 'Queued ✓';
+  toast('Queued — the bot picks it up within ~20 min 🚀');
+  const { data } = await sb.from('applications').select('*, job:job_postings(company,title,url,term)')
+    .order('created_at', { ascending: false });
+  apps = data || []; renderApps();
+}
+
+// ---------- applications tab ----------
+function renderApps() {
+  $('appCount').textContent = apps.length;
+  $('appList').innerHTML = apps.length ? apps.map(a => {
+    const answers = a.answers && Object.keys(a.answers).length
+      ? `<details class="answers"><summary class="meta">answers used (${Object.keys(a.answers).length})</summary><dl>` +
+        Object.entries(a.answers).map(([q, v]) => `<dt>${esc(q)}</dt><dd>${esc(v)}</dd>`).join('') +
+        '</dl></details>' : '';
+    const retry = (a.status === 'failed' || a.status === 'needs_review')
+      ? `<button class="ghost" onclick="retryApp('${a.id}')">Retry</button>` : '';
+    const remove = a.status !== 'applying'
+      ? `<button class="ghost" onclick="removeApp('${a.id}')">✕</button>` : '';
+    return `<div class="card job">
+      <div class="info">
+        <h3><a href="${esc(a.job?.url)}" target="_blank" rel="noopener">${esc(a.job?.company)} — ${esc(a.job?.title)}</a></h3>
+        <div class="meta">${esc(a.job?.term || '')} · updated ${new Date(a.updated_at).toLocaleString()}</div>
+        ${a.detail ? `<div class="detail">${esc(a.detail)}</div>` : ''}
+        ${answers}
+      </div>
+      <span class="status ${esc(a.status)}">${esc(a.status.replace('_', ' '))}</span>
+      ${retry}${remove}
+    </div>`;
+  }).join('') : '<div class="empty">Nothing queued yet — hit Apply on a job.</div>';
+}
+async function retryApp(id) {
+  const { error } = await sb.from('applications')
+    .update({ status: 'queued', detail: null, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) return toast('Retry failed: ' + error.message);
+  toast('Re-queued 🔁'); loadAll();
+}
+async function removeApp(id) {
+  const { error } = await sb.from('applications').delete().eq('id', id);
+  if (error) return toast('Remove failed: ' + error.message);
+  apps = apps.filter(a => a.id !== id); renderApps(); renderJobs();
+}
+
+// ---------- profile tab ----------
+const PROFILE_FIELDS = ['full_name','email','phone','location','linkedin','github','website',
+  'school','degree','major','grad_date','gpa','work_auth','needs_sponsorship',
+  'gender','race','veteran','disability','extra_context'];
+
+function fillProfileForm() {
+  for (const f of PROFILE_FIELDS) { const el = $('p_' + f); if (el) el.value = profile?.[f] ?? ''; }
+  $('p_auto_submit').checked = profile?.auto_submit !== false;
+  $('resumeStatus').innerHTML = profile?.resume_path ? '<span class="doc-ok">✓ uploaded</span>' : 'not uploaded';
+  $('transcriptStatus').innerHTML = profile?.transcript_path ? '<span class="doc-ok">✓ uploaded</span>' : 'not uploaded';
+  $('qaList').innerHTML = '';
+  const qa = profile?.common_answers || {};
+  Object.entries(qa).forEach(([q, a]) => addQaRow(q, a));
+  if (!Object.keys(qa).length) {
+    addQaRow('Why do you want to work here?', '');
+    addQaRow('Are you willing to relocate?', '');
+  }
+}
+function addQaRow(q, a) {
+  const div = document.createElement('div');
+  div.className = 'qa';
+  div.innerHTML = `<input class="qa-q" placeholder="Question" value="${esc(q)}">
+    <input class="qa-a" placeholder="Your answer" value="${esc(a)}">
+    <button class="ghost" onclick="this.parentElement.remove()">✕</button>`;
+  $('qaList').appendChild(div);
+}
+
+async function uploadDoc(inputId, name, column) {
+  const file = $(inputId).files[0];
+  if (!file) return profile?.[column] ?? null;
+  if (file.type !== 'application/pdf') { toast(name + ' must be a PDF'); throw new Error('not pdf'); }
+  const path = `${user.id}/${name}.pdf`;
+  const { error } = await sb.storage.from('job-docs').upload(path, file, { upsert: true, contentType: 'application/pdf' });
+  if (error) { toast(name + ' upload failed: ' + error.message); throw error; }
+  return path;
+}
+
+async function saveProfile() {
+  $('saveStatus').textContent = 'saving…';
+  try {
+    const row = { user_id: user.id, updated_at: new Date().toISOString() };
+    for (const f of PROFILE_FIELDS) row[f] = $('p_' + f).value.trim() || null;
+    row.auto_submit = $('p_auto_submit').checked;
+    row.common_answers = {};
+    document.querySelectorAll('#qaList .qa').forEach(div => {
+      const q = div.querySelector('.qa-q').value.trim();
+      const a = div.querySelector('.qa-a').value.trim();
+      if (q && a) row.common_answers[q] = a;
+    });
+    const newResume = $('resumeFile').files[0];
+    row.resume_path = await uploadDoc('resumeFile', 'resume', 'resume_path');
+    row.transcript_path = await uploadDoc('transcriptFile', 'transcript', 'transcript_path');
+    if (newResume) row.resume_text = null;   // force re-extraction on next apply run
+    const { error } = await sb.from('job_profile').upsert(row);
+    if (error) throw error;
+    profile = { ...profile, ...row };
+    $('saveStatus').textContent = '';
+    fillProfileForm();
+    $('profileWarning').style.display = (profile.resume_path && profile.full_name) ? 'none' : 'block';
+    toast('Profile saved ✓');
+  } catch (e) {
+    $('saveStatus').textContent = '';
+    if (e.message !== 'not pdf') toast('Save failed: ' + e.message);
+  }
+}
+
+// ---------- tabs ----------
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  for (const n of ['jobs', 'apps', 'profile']) $('tab-' + n).style.display = (n === name) ? 'block' : 'none';
+}
+
+init();
+</script>
+</body>
+</html>

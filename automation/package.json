@@ -1,0 +1,15 @@
+{
+  "name": "auto-apply-automation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scrape": "node scrape.mjs",
+    "apply": "node apply.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "nodemailer": "^6.9.14",
+    "playwright": "^1.46.0",
+    "unpdf": "^0.11.0"
+  }
+}
