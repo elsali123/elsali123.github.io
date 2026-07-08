@@ -111,6 +111,25 @@ for (const app of queue) {
     await setStatus(app.id, r.status, r.detail, r.answers);
     results.push({ tag, ...r, url: job.url });
     console.log(`  → ${r.status}: ${r.detail}`);
+    // Assisted mode: form is filled but blocked (CAPTCHA etc.) — keep the
+    // window open for the human to finish, and record it if they submit.
+    if (!DRY_RUN && HEADED && r.status === 'needs_review') {
+      const hold = Number(process.env.HOLD_SECONDS || 300);
+      console.log(`  👤 Browser stays open ${hold}s — complete the CAPTCHA and click submit yourself…`);
+      const deadline = Date.now() + hold * 1000;
+      let confirmed = false;
+      while (Date.now() < deadline && !confirmed) {
+        confirmed = await page.evaluate(() =>
+          /thank you|application (submitted|received|complete)|we('|’)ve received|successfully submitted/i
+            .test(document.body.innerText)).catch(() => false);
+        if (!confirmed) await page.waitForTimeout(5000);
+      }
+      if (confirmed) {
+        await setStatus(app.id, 'submitted', 'Submitted manually in assisted session', r.answers);
+        Object.assign(results[results.length - 1], { status: 'submitted', detail: 'Submitted manually (assisted)' });
+        console.log('  ✅ manual submission confirmed');
+      }
+    }
     if (DRY_RUN) {
       console.log('  Answers used:');
       for (const [q, a] of Object.entries(r.answers)) console.log(`    • ${q} → ${a}`);
