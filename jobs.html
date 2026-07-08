@@ -5,74 +5,107 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
 <title>Auto-Apply · elsali.dev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #e6edf3;
-    --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; --yellow: #d29922;
-    --red: #f85149; --purple: #bc8cff;
+    --pink: #c2185b; --pink-soft: #f48fb1; --purple: #9575cd; --purple-deep: #5e35b1;
+    --text: #3a3242; --muted: #a695af; --border: rgba(194, 24, 91, 0.14);
+    --card: rgba(255, 255, 255, 0.72); --card-solid: #fffdfe;
+    --green: #2e7d32; --amber: #b5860b; --red: #c62828;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px;
-    border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 5; }
-  header h1 { font-size: 18px; margin: 0; }
+  body { margin: 0; color: var(--text);
+    background: linear-gradient(135deg, #fce4ec 0%, #e3f2fd 50%, #ede7f6 100%);
+    background-attachment: fixed;
+    font: 15px/1.55 'DM Sans', 'Segoe UI', sans-serif; }
+  header { display: flex; align-items: center; gap: 14px; padding: 16px 26px;
+    position: sticky; top: 0; z-index: 5;
+    background: rgba(255, 253, 254, 0.8); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); }
+  header h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 22px;
+    font-weight: 600; margin: 0; color: var(--pink); letter-spacing: .2px; }
   header .spacer { flex: 1; }
-  main { max-width: 1000px; margin: 0 auto; padding: 20px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 18px; }
-  .tab { padding: 7px 16px; border: 1px solid var(--border); border-radius: 8px;
-    background: var(--panel); color: var(--muted); cursor: pointer; font-size: 14px; }
-  .tab.active { color: var(--text); border-color: var(--accent); }
-  .tab .badge { background: var(--accent); color: #000; border-radius: 10px;
-    padding: 0 7px; font-size: 12px; margin-left: 6px; }
-  .card { background: var(--panel); border: 1px solid var(--border);
-    border-radius: 10px; padding: 16px; margin-bottom: 12px; }
-  button.primary { background: var(--accent); color: #06131f; border: 0; border-radius: 8px;
-    padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 14px; }
-  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border);
-    border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 13px; }
+  main { max-width: 1020px; margin: 0 auto; padding: 28px 20px 60px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 22px; }
+  .tab { padding: 8px 18px; border: 1px solid transparent; border-radius: 999px;
+    background: rgba(255,255,255,.5); color: var(--muted); cursor: pointer;
+    font-size: 14px; font-weight: 500; transition: all .18s ease; }
+  .tab:hover { color: var(--pink); background: rgba(255,255,255,.85); }
+  .tab.active { color: #fff; background: linear-gradient(120deg, var(--pink), var(--purple-deep));
+    box-shadow: 0 4px 14px rgba(194,24,91,.25); }
+  .tab .badge { background: rgba(255,255,255,.35); color: inherit; border-radius: 999px;
+    padding: 0 8px; font-size: 12px; margin-left: 6px; }
+  .tab:not(.active) .badge { background: rgba(194,24,91,.1); color: var(--pink); }
+  .card { background: var(--card); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.7); border-radius: 18px;
+    padding: 18px 20px; margin-bottom: 14px;
+    box-shadow: 0 6px 24px rgba(149,117,205,.10);
+    transition: transform .18s ease, box-shadow .18s ease; }
+  .card.job:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(194,24,91,.14); }
+  button.primary { background: linear-gradient(120deg, var(--pink), var(--purple-deep));
+    color: #fff; border: 0; border-radius: 999px; padding: 9px 20px;
+    font-weight: 600; cursor: pointer; font-size: 14px; font-family: inherit;
+    box-shadow: 0 4px 14px rgba(194,24,91,.28); transition: all .18s ease; }
+  button.primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 7px 20px rgba(194,24,91,.36); }
+  button.ghost { background: rgba(255,255,255,.6); color: var(--pink); font-family: inherit;
+    border: 1px solid rgba(194,24,91,.25); border-radius: 999px; padding: 7px 16px;
+    cursor: pointer; font-size: 13px; font-weight: 500; transition: all .18s ease; }
+  button.ghost:hover { background: #fff; border-color: var(--pink); }
   button:disabled { opacity: .45; cursor: default; }
-  input, select, textarea { background: #0d1117; color: var(--text); border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px 10px; font-size: 14px; width: 100%; font-family: inherit; }
+  input, select, textarea { background: rgba(255,255,255,.85); color: var(--text);
+    border: 1px solid rgba(149,117,205,.3); border-radius: 12px;
+    padding: 9px 12px; font-size: 14px; width: 100%; font-family: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--pink-soft);
+    box-shadow: 0 0 0 3px rgba(244,143,177,.2); }
   textarea { resize: vertical; }
-  label { font-size: 12.5px; color: var(--muted); display: block; margin: 10px 0 4px; }
-  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 14px; }
-  .job { display: flex; gap: 12px; align-items: flex-start; }
+  label { font-size: 12.5px; color: var(--muted); display: block; margin: 10px 0 4px; font-weight: 500; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 16px; }
+  .job { display: flex; gap: 14px; align-items: flex-start; }
   .job .info { flex: 1; min-width: 0; }
-  .job h3 { margin: 0 0 2px; font-size: 15px; }
-  .job h3 a { color: var(--text); text-decoration: none; }
-  .job h3 a:hover { color: var(--accent); }
+  .job h3 { margin: 0 0 3px; font-size: 15.5px; font-weight: 600; }
+  .job h3 a { color: var(--text); text-decoration: none; transition: color .15s ease; }
+  .job h3 a:hover { color: var(--pink); }
+  h3 { font-family: 'Playfair Display', Georgia, serif; color: var(--pink); font-weight: 600; }
   .meta { font-size: 12.5px; color: var(--muted); }
-  .chip { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 10px;
-    border: 1px solid var(--border); color: var(--muted); margin-right: 5px; }
-  .chip.new { color: var(--green); border-color: var(--green); }
-  .status { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
-  .status.staged       { background: #21262d; color: var(--muted); }
-  .status.ready        { background: #2b1d41; color: var(--purple); }
-  .status.queued       { background: #1c2d41; color: var(--accent); }
-  .status.applying     { background: #2d2a1c; color: var(--yellow); }
-  .status.submitted    { background: #1c2f22; color: var(--green); }
-  .status.needs_review { background: #2d2a1c; color: var(--yellow); }
-  .status.failed       { background: #3b1d1f; color: var(--red); }
-  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .meta code, code { background: rgba(149,117,205,.12); border-radius: 6px; padding: 1px 6px; font-size: 12px; }
+  .chip { display: inline-block; font-size: 11.5px; padding: 2px 10px; border-radius: 999px;
+    background: rgba(149,117,205,.12); color: var(--purple-deep); margin-right: 5px; font-weight: 500; }
+  .chip.new { background: rgba(46,125,50,.12); color: var(--green); }
+  .status { font-size: 12px; font-weight: 600; padding: 3px 12px; border-radius: 999px; white-space: nowrap; }
+  .status.staged       { background: rgba(166,149,175,.16); color: #7c6f87; }
+  .status.ready        { background: rgba(149,117,205,.18); color: var(--purple-deep); }
+  .status.queued       { background: rgba(33,150,243,.14); color: #1565c0; }
+  .status.applying     { background: rgba(255,193,7,.2); color: var(--amber); }
+  .status.submitted    { background: rgba(76,175,80,.16); color: var(--green); }
+  .status.needs_review { background: rgba(255,152,0,.16); color: var(--amber); }
+  .status.failed       { background: rgba(198,40,40,.12); color: var(--red); }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .filters input, .filters select { width: auto; }
   .filters input[type="search"] { flex: 1; min-width: 160px; }
-  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
-  .qa { display: grid; grid-template-columns: 1fr 1fr 34px; gap: 8px; margin-bottom: 8px; }
+  .empty { color: var(--muted); text-align: center; padding: 48px 0; font-style: italic; }
+  .qa { display: grid; grid-template-columns: 1fr 1fr 38px; gap: 8px; margin-bottom: 8px; }
   .detail { font-size: 12.5px; color: var(--muted); margin-top: 6px; white-space: pre-wrap; }
-  .answers { font-size: 12.5px; margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 8px; }
+  .answers { font-size: 12.5px; margin-top: 8px; border-top: 1px dashed rgba(149,117,205,.35); padding-top: 8px; }
+  .answers summary { cursor: pointer; }
   .answers dt { color: var(--muted); }
   .answers dd { margin: 0 0 6px; }
-  .doc-ok { color: var(--green); font-size: 13px; }
-  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    background: var(--panel); border: 1px solid var(--border); padding: 10px 20px;
-    border-radius: 10px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 20; }
+  .doc-ok { color: var(--green); font-size: 13px; font-weight: 500; }
+  #toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+    background: rgba(58,50,66,.94); color: #fff; padding: 11px 22px;
+    border-radius: 999px; opacity: 0; transition: opacity .25s; pointer-events: none;
+    z-index: 20; font-size: 14px; box-shadow: 0 8px 24px rgba(58,50,66,.3); }
   #toast.show { opacity: 1; }
-  .signin { text-align: center; padding: 80px 20px; }
+  .signin { text-align: center; padding: 90px 24px; }
+  .signin h2 { font-family: 'Playfair Display', Georgia, serif; color: var(--pink); font-size: 28px; }
   .switch { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 14px; }
-  .note { font-size: 12.5px; color: var(--muted); background: #10161d; border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+  .note { font-size: 12.5px; color: #8a7d94; background: rgba(255,255,255,.55);
+    border: 1px solid rgba(149,117,205,.2); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; }
+  .note a { color: var(--pink); }
+  input[type="checkbox"] { accent-color: var(--pink); }
+  input[type="file"] { background: transparent; border: 1px dashed rgba(149,117,205,.4); padding: 12px; }
 </style>
 </head>
 <body>
@@ -87,7 +120,7 @@
 <main>
   <div id="signinView" class="signin card" style="display:none">
     <h2>Sign in to manage your applications</h2>
-    <p class="meta">Job feed updates hourly. Queue a job and the bot applies for you within ~20 minutes.</p>
+    <p class="meta">Job feed updates hourly. Stage the roles you like, release them with one click, and the bot fills each application while you approve the final submit.</p>
     <button class="primary" onclick="signIn()">Sign in with Google</button>
   </div>
 
