@@ -55,7 +55,8 @@ export function isUSLocation(locations) {
 
 export function detectAts(url) {
   const u = (url || '').toLowerCase();
-  if (u.includes('greenhouse.io')) return 'greenhouse';
+  // gh_jid= marks a Greenhouse board embedded in a company's own site
+  if (u.includes('greenhouse.io') || u.includes('gh_jid=')) return 'greenhouse';
   if (u.includes('lever.co')) return 'lever';
   if (u.includes('ashbyhq.com')) return 'ashby';
   if (u.includes('myworkdayjobs.com')) return 'workday';

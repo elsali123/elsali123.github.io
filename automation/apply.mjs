@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { fillAndSubmit } from './lib/fill.mjs';
-import { env, sendEmail, esc } from './lib/util.mjs';
+import { env, sendEmail, esc, detectAts } from './lib/util.mjs';
 
 const MAX_PER_RUN = Number(process.env.MAX_APPLICATIONS_PER_RUN || 8);
 const SUPPORTED_ATS = new Set(['greenhouse', 'lever', 'ashby']);
@@ -83,6 +83,8 @@ const browser = await chromium.launch({ headless: !HEADED, slowMo: HEADED ? 120 
 const results = [];
 for (const app of queue) {
   const job = app.job;
+  // Recompute ATS from the URL in case the stored value predates detector fixes.
+  if (!SUPPORTED_ATS.has(job.ats)) job.ats = detectAts(job.url);
   const tag = `${job.company} — ${job.title}`;
   console.log(`\n▶ ${tag} (${job.ats})`);
   await setStatus(app.id, 'applying');
@@ -96,10 +98,13 @@ for (const app of queue) {
   if (!SUPPORTED_ATS.has(job.ats)) {
     await setStatus(app.id, 'needs_review', `Unsupported ATS (${job.ats}) — apply manually: ${job.url}`);
     results.push({ tag, status: 'needs_review', detail: `unsupported ATS ${job.ats}`, url: job.url });
+    console.log(`  → skipped: unsupported ATS (${job.ats})`);
     continue;
   }
 
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1600 } });
+  // Tall viewport helps headless screenshots; a screen-sized one is used when
+  // a human is watching (HEADED) so window scrolling behaves normally.
+  const ctx = await browser.newContext({ viewport: HEADED ? { width: 1200, height: 800 } : { width: 1280, height: 1600 } });
   const page = await ctx.newPage();
   try {
     const r = await fillAndSubmit(page, job, entry.profile, entry.files, { dryRun: DRY_RUN });
@@ -110,8 +115,9 @@ for (const app of queue) {
       console.log('  Answers used:');
       for (const [q, a] of Object.entries(r.answers)) console.log(`    • ${q} → ${a}`);
       if (HEADED) {
-        console.log('  Browser stays open 60s so you can inspect the filled form…');
-        await page.waitForTimeout(60000);
+        const hold = Number(process.env.HOLD_SECONDS || 120);
+        console.log(`  Browser stays open ${hold}s so you can inspect the filled form…`);
+        await page.waitForTimeout(hold * 1000);
       }
     }
   } catch (e) {
