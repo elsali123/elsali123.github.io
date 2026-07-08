@@ -399,7 +399,8 @@ function renderApps() {
   const staged = apps.filter(a => a.status === 'staged').length;
   const ready = apps.filter(a => a.status === 'ready').length;
   $('releaseBar').innerHTML =
-    (staged ? `<button class="primary" onclick="releaseAll()">🚀 Apply all (${staged} staged)</button> ` : '') +
+    (staged ? `<button class="primary" id="releaseBtn" onclick="releaseSelected()">🚀 Apply selected (${staged}/${staged})</button>
+       <button class="ghost" onclick="toggleSelectAll()">select all / none</button> ` : '') +
     (ready ? `<span class="meta">— ${ready} released: double-click <b>automation/assist.command</b> on your Mac (or <code>npm run assist</code>) to fill them; you submit each by hand</span>` : '');
   $('appList').innerHTML = apps.length ? apps.map(a => {
     const answers = a.answers && Object.keys(a.answers).length
@@ -412,7 +413,11 @@ function renderApps() {
       ? `<button class="ghost" onclick="markSubmitted('${a.id}')" title="I submitted this myself">✓ Mark submitted</button>` : '';
     const remove = a.status !== 'applying'
       ? `<button class="ghost" onclick="removeApp('${a.id}')">✕</button>` : '';
+    const checkbox = a.status === 'staged'
+      ? `<input type="checkbox" class="stagedSel" data-id="${a.id}" checked onchange="updateReleaseCount()"
+           style="width:18px;height:18px;margin-top:4px;flex:none">` : '';
     return `<div class="card job">
+      ${checkbox}
       <div class="info">
         <h3><a href="${esc(a.job?.url)}" target="_blank" rel="noopener">${esc(a.job?.company)} — ${esc(a.job?.title)}</a></h3>
         <div class="meta">${esc(a.job?.term || '')} · updated ${new Date(a.updated_at).toLocaleString()}</div>
@@ -430,12 +435,29 @@ async function retryApp(id) {
   if (error) return toast('Retry failed: ' + error.message);
   toast('Back in the cart 📦'); loadAll();
 }
-async function releaseAll() {
+function selectedStagedIds() {
+  return [...document.querySelectorAll('.stagedSel:checked')].map(cb => cb.dataset.id);
+}
+function updateReleaseCount() {
+  const total = document.querySelectorAll('.stagedSel').length;
+  const sel = selectedStagedIds().length;
+  const btn = $('releaseBtn');
+  if (btn) { btn.textContent = `🚀 Apply selected (${sel}/${total})`; btn.disabled = sel === 0; }
+}
+function toggleSelectAll() {
+  const boxes = [...document.querySelectorAll('.stagedSel')];
+  const allChecked = boxes.every(cb => cb.checked);
+  boxes.forEach(cb => { cb.checked = !allChecked; });
+  updateReleaseCount();
+}
+async function releaseSelected() {
+  const ids = selectedStagedIds();
+  if (!ids.length) return toast('Nothing selected');
   const { error } = await sb.from('applications')
     .update({ status: 'ready', updated_at: new Date().toISOString() })
-    .eq('user_id', user.id).eq('status', 'staged');
+    .eq('user_id', user.id).eq('status', 'staged').in('id', ids);
   if (error) return toast('Release failed: ' + error.message);
-  toast('Released 🚀 — start the assisted session on your computer');
+  toast(`Released ${ids.length} 🚀 — start the assisted session on your computer`);
   loadAll();
 }
 async function markSubmitted(id) {
