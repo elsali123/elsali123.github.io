@@ -400,7 +400,7 @@ function renderApps() {
   const ready = apps.filter(a => a.status === 'ready').length;
   $('releaseBar').innerHTML =
     (staged ? `<button class="primary" onclick="releaseAll()">🚀 Apply all (${staged} staged)</button> ` : '') +
-    (ready ? `<span class="meta">— ${ready} released: run <code>npm run assist</code> in automation/ to fill them; you submit each by hand</span>` : '');
+    (ready ? `<span class="meta">— ${ready} released: double-click <b>automation/assist.command</b> on your Mac (or <code>npm run assist</code>) to fill them; you submit each by hand</span>` : '');
   $('appList').innerHTML = apps.length ? apps.map(a => {
     const answers = a.answers && Object.keys(a.answers).length
       ? `<details class="answers"><summary class="meta">answers used (${Object.keys(a.answers).length})</summary><dl>` +
