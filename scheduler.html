@@ -445,8 +445,14 @@
     .cal-events-layer{position:absolute;top:0;left:2px;right:2px;pointer-events:none}
     .cal-event{position:absolute;left:0;right:0;border-radius:6px;padding:3px 7px;font-size:.73rem;font-weight:500;line-height:1.3;overflow:hidden;cursor:pointer;pointer-events:all;transition:filter .15s,transform .15s;z-index:2}
     .cal-event:hover{filter:brightness(.93);transform:scaleX(.98)}
+    .cal-event.draggable{cursor:grab}
+    .cal-event.draggable:active{cursor:grabbing}
+    .cal-event.dragging{opacity:.85;box-shadow:0 10px 28px rgba(90,60,120,.25);z-index:20;transition:none}
+    .cal-event.dragging:hover{transform:none;filter:none}
+    .cal-event-resize{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize;border-bottom-left-radius:6px;border-bottom-right-radius:6px;background:linear-gradient(transparent,rgba(0,0,0,.08))}
+    .cal-event-resize:hover{background:linear-gradient(transparent,rgba(0,0,0,.18))}
     .cal-event-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
-    .cal-event-time{opacity:.8;font-size:.68rem}
+    .cal-event-time{opacity:.78;font-size:.68rem;font-variant-numeric:tabular-nums;letter-spacing:.01em;font-weight:500}
     .evt-study{background:rgba(243,229,245,.9);color:#6a1b9a;border-left:3px solid #9c27b0}
     .evt-hw{background:rgba(227,242,253,.9);color:#1565c0;border-left:3px solid #2196f3}
     .evt-club{background:rgba(252,228,236,.9);color:#c2185b;border-left:3px solid #e91e63}
@@ -1076,10 +1082,29 @@ function fmt12(timeStr) {
   const h12 = h % 12 || 12;
   return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
 }
+// Compact, typographically tidy time formatting.
+//   "09:00" → "9am"        "09:30" → "9:30am"
+// Shared period collapses:
+//   09:00 → 10:30          → "9 – 10:30am"
+//   14:00 → 15:00          → "2 – 3pm"
+// Mixed periods:
+//   11:30 → 13:15          → "11:30am – 1:15pm"
+function fmt12Parts(timeStr) {
+  const [h,m] = timeStr.split(':').map(Number);
+  return { h, m, period: h >= 12 ? 'pm' : 'am', h12: h % 12 || 12 };
+}
+function fmtTimeShort(p, hidePeriod) {
+  const t = p.m === 0 ? `${p.h12}` : `${p.h12}:${String(p.m).padStart(2,'0')}`;
+  return hidePeriod ? t : `${t}${p.period}`;
+}
 function fmtTimeRange(s) {
-  if (s.timeStart && s.timeEnd) return fmt12(s.timeStart)+' – '+fmt12(s.timeEnd);
-  if (s.timeStart) return fmt12(s.timeStart);
-  return '';
+  if (!s.timeStart) return '';
+  const a = fmt12Parts(s.timeStart);
+  if (!s.timeEnd) return fmtTimeShort(a, false);
+  const b = fmt12Parts(s.timeEnd);
+  const samePeriod = a.period === b.period;
+  // Non-breaking spaces around the en-dash so it stays together in narrow blocks.
+  return `${fmtTimeShort(a, samePeriod)} – ${fmtTimeShort(b, false)}`;
 }
 function fmtDate(d){
   if(!d)return '';
@@ -1089,6 +1114,11 @@ function timeToMins(t){
   if(!t)return -1;
   const [h,m]=t.split(':').map(Number);
   return h*60+m;
+}
+function minsToTime(m){
+  m = Math.max(0, Math.min(24*60, m|0));
+  const h = Math.floor(m/60), mm = m%60;
+  return `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
 }
 
 // ═══════════════════════════════════════════
@@ -1411,6 +1441,117 @@ function getWeekStart(date) {
   return d;
 }
 
+// Makes a scheduler-authored calendar block interactive:
+//   • grab the body → move (vertical = reschedule, horizontal = change day)
+//   • grab the bottom handle → resize (change end time)
+// Both snap to 15-min increments. Commits by mutating the owning task's session
+// in-place, then calls render().
+function attachCalDrag(el, evt, PX) {
+  const SNAP = 15;            // minutes
+  const MOVE_THRESHOLD = 3;   // px before we treat it as a drag, not a click
+  const MIN_DURATION = 15;    // minutes — can't shrink below this
+  let dragging = false, moved = false, mode = 'move';
+  let startX, startY, pointerId;
+  let grabOffsetY = 0;        // distance from the block's top edge to the grab point
+  let origHeightPx = 0;
+
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    mode = e.target.classList.contains('cal-event-resize') ? 'resize' : 'move';
+    const rect = el.getBoundingClientRect();
+    grabOffsetY = e.clientY - rect.top;
+    origHeightPx = rect.height;
+    dragging = true;
+    moved = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    pointerId = e.pointerId;
+    try { el.setPointerCapture(pointerId); } catch(_) {}
+    e.stopPropagation();
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!moved && Math.hypot(dx, dy) > MOVE_THRESHOLD) {
+      moved = true;
+      el.classList.add('dragging');
+    }
+    if (!moved) return;
+    if (mode === 'move') {
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+    } else {
+      // Live-preview resize by adjusting height; commit on pointerup.
+      const minPx = (MIN_DURATION / 60) * PX;
+      el.style.height = Math.max(minPx, origHeightPx + dy) + 'px';
+    }
+  });
+
+  function endDrag(e, commit) {
+    if (!dragging) return;
+    dragging = false;
+    try { el.releasePointerCapture(pointerId); } catch(_) {}
+    el.style.transform = '';
+    el.style.height = '';
+    el.classList.remove('dragging');
+
+    if (!moved) return;                // treat as click — handled by click listener
+    el._justDragged = true;            // suppress the click that follows pointerup
+    setTimeout(() => { el._justDragged = false; }, 50);
+    if (!commit) return;
+
+    const task = tasks.find(t => t.id === evt.taskId);
+    if (!task || !task.sessions || !task.sessions[evt.sessionIdx]) { render(); return; }
+    const session = task.sessions[evt.sessionIdx];
+    const origStart = timeToMins(evt.timeStart);
+    const origDuration = evt.timeEnd ? Math.max(SNAP, timeToMins(evt.timeEnd) - origStart) : 30;
+
+    if (mode === 'resize') {
+      // End-time change only; start time + date unchanged.
+      const dy = e.clientY - startY;
+      const newHeightPx = Math.max((MIN_DURATION / 60) * PX, origHeightPx + dy);
+      let newDuration = Math.round((newHeightPx / PX) * 60 / SNAP) * SNAP;
+      newDuration = Math.max(MIN_DURATION, Math.min(24*60 - origStart, newDuration));
+      if (newDuration === origDuration) return;
+      session.timeEnd = minsToTime(origStart + newDuration);
+      render();
+      return;
+    }
+
+    // Move: figure out which day column the pointer's block-top lands in.
+    const prevPE = el.style.pointerEvents;
+    el.style.pointerEvents = 'none';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    el.style.pointerEvents = prevPE;
+    const col = under ? under.closest('.cal-day-col') : null;
+    if (!col || !col.dataset.date) { render(); return; }
+    const newDate = col.dataset.date;
+    const dayIdx = col.dataset.day;
+    // Always measure from the hour-0 row of that day so the math is scroll-safe.
+    const hour0 = document.querySelector(`.cal-day-col[data-day="${dayIdx}"][data-hour="0"]`);
+    const base = (hour0 || col).getBoundingClientRect();
+    // The block's would-be top edge is (pointer - grab-offset); convert that to
+    // minutes from midnight, then snap. Using the top edge (not the pointer)
+    // means grabbing the middle of a 9:00 block and nudging 15 min down lands
+    // at 9:15, not 9:45.
+    const blockTopY = e.clientY - grabOffsetY;
+    const yFromTop = blockTopY - base.top;
+    let newStart = Math.round((yFromTop / PX) * 60 / SNAP) * SNAP;
+    newStart = Math.max(0, Math.min(24*60 - origDuration, newStart));
+
+    if (newStart === origStart && newDate === session.date) return;
+    session.date = newDate;
+    session.timeStart = minsToTime(newStart);
+    session.timeEnd = minsToTime(newStart + origDuration);
+    render();
+  }
+
+  el.addEventListener('pointerup',     (e) => endDrag(e, true));
+  el.addEventListener('pointercancel', (e) => endDrag(e, false));
+}
+
+
 let miniMonthDate = new Date(); // tracks mini-month view independently
 
 function renderCalendar() {
@@ -1613,10 +1754,20 @@ function renderCalendar() {
       el.title=`${evt.name}${tl?' | '+tl:''}${evt.goal?' | '+evt.goal:''}${titleSuffix}`;
       el.addEventListener('click',e=>{
         e.stopPropagation();
+        if (el._justDragged) { el._justDragged = false; return; }
         if (evt.taskId) { toggleSessions(evt.taskId); return; }
         if (evt.gcalEventId) openGcalEdit(evt.gcalEventId);
       });
       if (evt.gcalEventId) el.style.cursor = 'pointer';
+      // Only scheduler-authored blocks (task sessions) are draggable.
+      // Gcal imports are intentionally not draggable — they live in Google Calendar.
+      if (evt.taskId && !evt.gcalEventId) {
+        el.classList.add('draggable');
+        const handle = document.createElement('div');
+        handle.className = 'cal-event-resize';
+        el.appendChild(handle);
+        attachCalDrag(el, evt, PX);
+      }
       overlay.appendChild(el);
     });
     firstCol.appendChild(overlay);

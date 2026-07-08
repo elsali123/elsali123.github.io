@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://api.github.com/repos/elsali123/elsali123.github.io/actions/workflows/job-scraper.yml/runs?per_page=3\")",
+      "Bash(python3 -c ' *)",
+      "Bash(npm ls *)",
+      "Bash(npm audit *)",
+      "Bash(npm info *)"
+    ]
+  }
+}

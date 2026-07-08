@@ -177,6 +177,7 @@
 
         /* Left-side nav cluster: flower toggle + mini identity */
         .nav-left {
+            position: relative;
             display: flex;
             align-items: center;
             gap: 0.55rem;
@@ -185,9 +186,8 @@
 
         /* Flower-toggle button — always visible, top-left */
         .flower-toggle {
-            width: 34px;
             height: 34px;
-            border-radius: 50%;
+            border-radius: 17px;
             border: 1.5px solid rgba(244, 143, 177, 0.45);
             background: rgba(255, 255, 255, 0.65);
             backdrop-filter: blur(8px);
@@ -195,10 +195,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 0.35rem;
             cursor: pointer;
             font-size: 1rem;
             line-height: 1;
-            padding: 0;
+            padding: 0 0.75rem 0 0.55rem;
             transition: all 0.22s ease;
             box-shadow: 0 2px 8px rgba(180, 120, 160, 0.12);
             flex-shrink: 0;
@@ -208,9 +209,73 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 14px rgba(244, 143, 177, 0.3);
         }
-        .flower-toggle.off {
+        .flower-toggle:focus-visible {
+            outline: 2px solid var(--pink-deep, #d16a94);
+            outline-offset: 2px;
+        }
+        .flower-toggle.off .flower-toggle-icon {
             opacity: 0.55;
             filter: grayscale(0.85);
+        }
+        .flower-toggle-label {
+            font-size: 0.74rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            color: var(--pink-deep, #d16a94);
+            white-space: nowrap;
+        }
+        .flower-toggle.off .flower-toggle-label {
+            color: #999;
+        }
+
+        /* One-time first-visit hint: soft pulse + tooltip bubble */
+        .flower-toggle.hint {
+            animation: flowerHintPulse 1.6s ease-in-out 3;
+        }
+        @keyframes flowerHintPulse {
+            0%, 100% { box-shadow: 0 2px 8px rgba(180, 120, 160, 0.12); }
+            50%      { box-shadow: 0 0 0 7px rgba(244, 143, 177, 0.32); }
+        }
+        .flower-hint-bubble {
+            position: absolute;
+            top: calc(100% + 12px);
+            left: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1.5px solid rgba(244, 143, 177, 0.45);
+            border-radius: 12px;
+            padding: 0.45rem 0.75rem;
+            font-size: 0.76rem;
+            color: var(--pink-deep, #d16a94);
+            box-shadow: 0 4px 14px rgba(180, 120, 160, 0.18);
+            white-space: nowrap;
+            opacity: 0;
+            transform: translateY(-4px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+            z-index: 101;
+        }
+        .flower-hint-bubble::before {
+            content: '';
+            position: absolute;
+            top: -5.5px;
+            left: 14px;
+            width: 8px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            border-left: 1.5px solid rgba(244, 143, 177, 0.45);
+            border-top: 1.5px solid rgba(244, 143, 177, 0.45);
+            transform: rotate(45deg);
+        }
+        .flower-hint-bubble.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .flower-toggle.hint {
+                animation: none;
+            }
         }
 
         /* Mini identity — hidden until scrolled */
@@ -715,6 +780,16 @@
         }
 
         @media (max-width: 480px) {
+            .flower-toggle-label {
+                display: none;
+            }
+
+            .flower-toggle {
+                width: 34px;
+                border-radius: 50%;
+                padding: 0;
+            }
+
             .nav-links a {
                 padding: 0.3rem 0.6rem;
                 font-size: 0.74rem;
@@ -740,7 +815,7 @@
     <canvas id="flower-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:3;"></canvas>
     <nav id="site-nav">
         <div class="nav-left">
-            <button id="flower-toggle" class="flower-toggle" type="button" aria-label="Toggle falling flowers" title="Toggle falling flowers">🌸</button>
+            <button id="flower-toggle" class="flower-toggle" type="button" aria-label="Toggle falling flowers" title="Toggle falling flowers"><span class="flower-toggle-icon">🌸</span><span class="flower-toggle-label">flowers on</span></button>
             <div class="nav-identity">
                 <img class="nav-avatar" src="profile.jpg" alt="Elsa Li">
                 <span class="nav-name">Elsa Li</span>
@@ -1733,7 +1808,7 @@
             Flower.prototype.draw = function() {
                 if (!this.img.complete) return;
                 ctx.save();
-                ctx.globalAlpha = this.opacity;
+                ctx.globalAlpha = this.opacity * fadeAlpha;
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.rot);
                 ctx.drawImage(this.img, -this.size/2, -this.size/2, this.size, this.size);
@@ -1750,16 +1825,27 @@
             var MAX      = 16;
 
             var enabled = true;
+            var fadeAlpha = 1;   // global fade: eases toward 1 when enabled, 0 when disabled
 
             function tick() {
                 ctx.clearRect(0, 0, W, H);
-                if (!enabled) { requestAnimationFrame(tick); return; }
+                fadeAlpha += ((enabled ? 1 : 0) - fadeAlpha) * 0.06;
+
+                // Fully faded out — drop particles and idle until re-enabled
+                if (!enabled && fadeAlpha < 0.02) {
+                    fadeAlpha = 0;
+                    flowers.length = 0;
+                    requestAnimationFrame(tick);
+                    return;
+                }
                 scrollBoost *= 0.87;
 
-                spawnT++;
-                if (spawnT >= SPAWN_IV && flowers.length < MAX) {
-                    flowers.push(new Flower());
-                    spawnT = 0;
+                if (enabled) {
+                    spawnT++;
+                    if (spawnT >= SPAWN_IV && flowers.length < MAX) {
+                        flowers.push(new Flower());
+                        spawnT = 0;
+                    }
                 }
 
                 for (var i = flowers.length - 1; i >= 0; i--) {
@@ -1774,10 +1860,8 @@
                 isEnabled: function() { return enabled; },
                 set: function(on) {
                     enabled = !!on;
-                    if (!enabled) {
-                        flowers.length = 0;
-                        ctx.clearRect(0, 0, W, H);
-                    } else if (imgs.length && imgs[0].complete) {
+                    // Off: keep drifting while fadeAlpha eases to 0 (tick handles cleanup)
+                    if (enabled && !flowers.length && imgs.length && imgs[0].complete) {
                         // Reseed only when images are ready (avoids undefined .img on early init)
                         for (var i = 0; i < 7; i++) flowers.push(new Flower(Math.random() * H));
                     }
@@ -1787,9 +1871,12 @@
 
             window.addEventListener('load', function() {
                 loadImgs(function() {
-                    // Seed flowers scattered across the viewport so it looks full immediately
-                    for (var i = 0; i < 7; i++) {
-                        flowers.push(new Flower(Math.random() * H));
+                    fadeAlpha = enabled ? 1 : 0;
+                    if (enabled) {
+                        // Seed flowers scattered across the viewport so it looks full immediately
+                        for (var i = 0; i < 7; i++) {
+                            flowers.push(new Flower(Math.random() * H));
+                        }
                     }
                     tick();
                 });
@@ -1802,13 +1889,17 @@
             if (!btn) return;
             var STORAGE_KEY = 'flowersEnabled';
             var stored = localStorage.getItem(STORAGE_KEY);
-            var initial = stored === null ? true : stored === '1';
+            // Default off for users with the OS reduce-motion setting; explicit choice wins
+            var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            var initial = stored === null ? !prefersReduced : stored === '1';
 
             function apply(on) {
                 if (window.flowerFX) window.flowerFX.set(on);
                 btn.classList.toggle('off', !on);
                 btn.setAttribute('aria-pressed', on ? 'true' : 'false');
                 btn.title = on ? 'Turn off falling flowers' : 'Turn on falling flowers';
+                var label = btn.querySelector('.flower-toggle-label');
+                if (label) label.textContent = on ? 'flowers on' : 'flowers off';
                 localStorage.setItem(STORAGE_KEY, on ? '1' : '0');
             }
 
@@ -1823,6 +1914,37 @@
                 var on = !(window.flowerFX && window.flowerFX.isEnabled());
                 apply(on);
             });
+
+            // One-time first-visit hint: pulse the toggle and show a tooltip bubble.
+            // Only fires if the visitor has never toggled and never seen the hint.
+            var HINT_KEY = 'flowerHintSeen';
+            if (stored === null && !localStorage.getItem(HINT_KEY)) {
+                localStorage.setItem(HINT_KEY, '1');
+                var bubble = document.createElement('div');
+                bubble.className = 'flower-hint-bubble';
+                bubble.textContent = initial
+                    ? '🌸 falling flowers — click to turn off'
+                    : '🌸 click to turn on falling flowers';
+                btn.parentNode.appendChild(bubble);
+
+                var hideTimer;
+                function dismissHint() {
+                    clearTimeout(hideTimer);
+                    btn.classList.remove('hint');
+                    bubble.classList.remove('show');
+                    setTimeout(function() {
+                        if (bubble.parentNode) bubble.parentNode.removeChild(bubble);
+                    }, 350);
+                    btn.removeEventListener('click', dismissHint);
+                }
+
+                setTimeout(function() {
+                    btn.classList.add('hint');
+                    bubble.classList.add('show');
+                }, 1200);
+                hideTimer = setTimeout(dismissHint, 8000);
+                btn.addEventListener('click', dismissHint);
+            }
         })();
     </script>
 </body>
