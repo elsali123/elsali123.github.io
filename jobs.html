@@ -312,7 +312,7 @@ async function queueApply(jobId, btn) {
 // ---------- manual "apply to a link" ----------
 function detectAtsFromUrl(u) {
   u = u.toLowerCase();
-  if (u.includes('greenhouse.io')) return 'greenhouse';
+  if (u.includes('greenhouse.io') || u.includes('gh_jid=')) return 'greenhouse';
   if (u.includes('lever.co')) return 'lever';
   if (u.includes('ashbyhq.com')) return 'ashby';
   if (u.includes('myworkdayjobs.com')) return 'workday';
@@ -402,6 +402,8 @@ function renderApps() {
         '</dl></details>' : '';
     const retry = (a.status === 'failed' || a.status === 'needs_review')
       ? `<button class="ghost" onclick="retryApp('${a.id}')">Retry</button>` : '';
+    const markDone = a.status !== 'submitted' && a.status !== 'applying'
+      ? `<button class="ghost" onclick="markSubmitted('${a.id}')" title="I submitted this myself">✓ Mark submitted</button>` : '';
     const remove = a.status !== 'applying'
       ? `<button class="ghost" onclick="removeApp('${a.id}')">✕</button>` : '';
     return `<div class="card job">
@@ -412,7 +414,7 @@ function renderApps() {
         ${answers}
       </div>
       <span class="status ${esc(a.status)}">${esc(a.status.replace('_', ' '))}</span>
-      ${retry}${remove}
+      ${retry}${markDone}${remove}
     </div>`;
   }).join('') : '<div class="empty">Nothing queued yet — hit Apply on a job.</div>';
 }
@@ -421,6 +423,13 @@ async function retryApp(id) {
     .update({ status: 'queued', detail: null, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) return toast('Retry failed: ' + error.message);
   toast('Re-queued 🔁'); loadAll();
+}
+async function markSubmitted(id) {
+  const { error } = await sb.from('applications')
+    .update({ status: 'submitted', detail: 'Marked submitted manually', updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return toast('Failed: ' + error.message);
+  toast('Marked submitted ✅'); loadAll();
 }
 async function removeApp(id) {
   const { error } = await sb.from('applications').delete().eq('id', id);
