@@ -48,6 +48,8 @@
     border: 1px solid var(--border); color: var(--muted); margin-right: 5px; }
   .chip.new { color: var(--green); border-color: var(--green); }
   .status { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+  .status.staged       { background: #21262d; color: var(--muted); }
+  .status.ready        { background: #2b1d41; color: var(--purple); }
   .status.queued       { background: #1c2d41; color: var(--accent); }
   .status.applying     { background: #2d2a1c; color: var(--yellow); }
   .status.submitted    { background: #1c2f22; color: var(--green); }
@@ -132,8 +134,9 @@
 
     <!-- ============ APPLICATIONS TAB ============ -->
     <section id="tab-apps" style="display:none">
-      <div class="note">✅ submitted &nbsp;·&nbsp; 👀 needs review (CAPTCHA / unsupported site / no confirmation — finish manually)
-        &nbsp;·&nbsp; ❌ failed (fix profile or retry)</div>
+      <div class="note">📦 staged (in your cart) &nbsp;·&nbsp; 🚀 ready (released — fill via assisted session)
+        &nbsp;·&nbsp; ✅ submitted &nbsp;·&nbsp; 👀 needs review &nbsp;·&nbsp; ❌ failed</div>
+      <div id="releaseBar" style="margin-bottom:12px"></div>
       <div id="appList"></div>
     </section>
 
@@ -300,10 +303,10 @@ async function queueApply(jobId, btn) {
     toast('Complete your profile + resume first ⚠️'); showTab('profile'); return;
   }
   btn.disabled = true;
-  const { error } = await sb.from('applications').insert({ user_id: user.id, job_id: jobId });
+  const { error } = await sb.from('applications').insert({ user_id: user.id, job_id: jobId, status: 'staged' });
   if (error) { btn.disabled = false; toast('Failed: ' + error.message); return; }
-  btn.textContent = 'Queued ✓';
-  toast('Queued — the bot picks it up within ~20 min 🚀');
+  btn.textContent = 'Staged ✓';
+  toast('Staged 📦 — release with "Apply all" when ready');
   const { data } = await sb.from('applications').select('*, job:job_postings(company,title,url,term)')
     .order('created_at', { ascending: false });
   apps = data || []; renderApps();
@@ -375,12 +378,10 @@ async function addManualJob() {
       if (error) throw error;
       jobId = data.id;
     }
-    const { error: aErr } = await sb.from('applications').insert({ user_id: user.id, job_id: jobId });
-    if (aErr) throw aErr.code === '23505' ? new Error('Already queued for this link') : aErr;
+    const { error: aErr } = await sb.from('applications').insert({ user_id: user.id, job_id: jobId, status: 'staged' });
+    if (aErr) throw aErr.code === '23505' ? new Error('Already staged for this link') : aErr;
     $('manualUrl').value = ''; $('manualCompany').value = ''; $('manualTitle').value = '';
-    toast(ats === 'greenhouse' || ats === 'lever' || ats === 'ashby'
-      ? 'Queued — the bot picks it up within ~20 min 🚀'
-      : `Queued — ${ats} isn't auto-submittable, it'll be flagged for manual finishing 👀`);
+    toast('Staged 📦 — release with "Apply all" when ready');
     loadAll();
   } catch (e) {
     toast('Failed: ' + e.message);
@@ -395,6 +396,11 @@ async function sbFindByUrl(norm) {
 // ---------- applications tab ----------
 function renderApps() {
   $('appCount').textContent = apps.length;
+  const staged = apps.filter(a => a.status === 'staged').length;
+  const ready = apps.filter(a => a.status === 'ready').length;
+  $('releaseBar').innerHTML =
+    (staged ? `<button class="primary" onclick="releaseAll()">🚀 Apply all (${staged} staged)</button> ` : '') +
+    (ready ? `<span class="meta">— ${ready} released: run <code>npm run assist</code> in automation/ to fill them; you submit each by hand</span>` : '');
   $('appList').innerHTML = apps.length ? apps.map(a => {
     const answers = a.answers && Object.keys(a.answers).length
       ? `<details class="answers"><summary class="meta">answers used (${Object.keys(a.answers).length})</summary><dl>` +
@@ -420,9 +426,17 @@ function renderApps() {
 }
 async function retryApp(id) {
   const { error } = await sb.from('applications')
-    .update({ status: 'queued', detail: null, updated_at: new Date().toISOString() }).eq('id', id);
+    .update({ status: 'staged', detail: null, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) return toast('Retry failed: ' + error.message);
-  toast('Re-queued 🔁'); loadAll();
+  toast('Back in the cart 📦'); loadAll();
+}
+async function releaseAll() {
+  const { error } = await sb.from('applications')
+    .update({ status: 'ready', updated_at: new Date().toISOString() })
+    .eq('user_id', user.id).eq('status', 'staged');
+  if (error) return toast('Release failed: ' + error.message);
+  toast('Released 🚀 — start the assisted session on your computer');
+  loadAll();
 }
 async function markSubmitted(id) {
   const { error } = await sb.from('applications')

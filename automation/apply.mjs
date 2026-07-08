@@ -15,8 +15,13 @@ const SUPPORTED_ATS = new Set(['greenhouse', 'lever', 'ashby']);
 // DRY_RUN=1: fill forms but never submit, never change statuses, no email.
 // HEADED=1: visible browser (for watching locally), slowed down a touch.
 const DRY_RUN = process.env.DRY_RUN === '1';
-const HEADED = process.env.HEADED === '1';
+// ASSIST=1: batch hand-submission session. Takes 'ready' applications (released
+// via the dashboard's Apply-all button), fills each in a visible browser, and
+// waits for YOU to review + click submit before moving to the next.
+const ASSIST = process.env.ASSIST === '1';
+const HEADED = process.env.HEADED === '1' || ASSIST;
 if (DRY_RUN) console.log('🧪 DRY RUN — nothing will be submitted or written back');
+if (ASSIST) console.log('🤝 ASSISTED SESSION — I fill, you submit each application by hand');
 
 const sb = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false },
@@ -25,9 +30,9 @@ const sb = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
 const { data: queue, error: qErr } = await sb
   .from('applications')
   .select('*, job:job_postings(*)')
-  .eq('status', 'queued')
+  .eq('status', ASSIST ? 'ready' : 'queued')
   .order('created_at')
-  .limit(MAX_PER_RUN);
+  .limit(ASSIST ? 50 : MAX_PER_RUN);
 if (qErr) throw qErr;
 if (!queue?.length) { console.log('Queue empty — nothing to do.'); process.exit(0); }
 console.log(`Processing ${queue.length} queued application(s)`);
@@ -107,15 +112,15 @@ for (const app of queue) {
   const ctx = await browser.newContext({ viewport: HEADED ? { width: 1200, height: 800 } : { width: 1280, height: 1600 } });
   const page = await ctx.newPage();
   try {
-    const r = await fillAndSubmit(page, job, entry.profile, entry.files, { dryRun: DRY_RUN });
-    await setStatus(app.id, r.status, r.detail, r.answers);
-    results.push({ tag, ...r, url: job.url });
-    console.log(`  → ${r.status}: ${r.detail}`);
-    // Assisted mode: form is filled but blocked (CAPTCHA etc.) — keep the
-    // window open for the human to finish, and record it if they submit.
-    if (!DRY_RUN && HEADED && r.status === 'needs_review') {
-      const hold = Number(process.env.HOLD_SECONDS || 300);
-      console.log(`  👤 Browser stays open ${hold}s — complete the CAPTCHA and click submit yourself…`);
+    // ASSIST fills but never auto-submits (dryRun stops before the submit click).
+    let r = await fillAndSubmit(page, job, entry.profile, entry.files, { dryRun: DRY_RUN || ASSIST });
+    // Hand-submission hold: in ASSIST for every app, otherwise only when a
+    // headed real run got blocked (CAPTCHA) — watch for the confirmation page.
+    const needsHuman = (ASSIST && (r.status === 'dry_run' || r.status === 'needs_review'))
+      || (!DRY_RUN && !ASSIST && HEADED && r.status === 'needs_review');
+    if (needsHuman) {
+      const hold = Number(process.env.HOLD_SECONDS || 600);
+      console.log(`  👤 Your turn — review and click submit (waiting up to ${Math.round(hold / 60)} min)…`);
       const deadline = Date.now() + hold * 1000;
       let confirmed = false;
       while (Date.now() < deadline && !confirmed) {
@@ -124,12 +129,14 @@ for (const app of queue) {
             .test(document.body.innerText)).catch(() => false);
         if (!confirmed) await page.waitForTimeout(5000);
       }
-      if (confirmed) {
-        await setStatus(app.id, 'submitted', 'Submitted manually in assisted session', r.answers);
-        Object.assign(results[results.length - 1], { status: 'submitted', detail: 'Submitted manually (assisted)' });
-        console.log('  ✅ manual submission confirmed');
-      }
+      r = confirmed
+        ? { ...r, status: 'submitted', detail: 'Submitted manually in assisted session' }
+        : { ...r, status: 'needs_review', detail: 'Assisted session ended without submission' };
+      console.log(confirmed ? '  ✅ manual submission confirmed' : '  ⏭ not submitted — leaving as needs_review');
     }
+    await setStatus(app.id, r.status, r.detail, r.answers); // no-op in DRY_RUN
+    results.push({ tag, ...r, url: job.url });
+    console.log(`  → ${r.status}: ${r.detail}`);
     if (DRY_RUN) {
       console.log('  Answers used:');
       for (const [q, a] of Object.entries(r.answers)) console.log(`    • ${q} → ${a}`);

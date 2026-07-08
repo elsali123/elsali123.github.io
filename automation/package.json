@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "scrape": "node scrape.mjs",
-    "apply": "node apply.mjs"
+    "apply": "node apply.mjs",
+    "assist": "ASSIST=1 node --env-file=.env.local apply.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
