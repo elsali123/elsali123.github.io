@@ -1,8 +1,9 @@
 name: Auto-apply worker
 
+# Unattended submission is disabled: applications must be reviewed and
+# submitted by a human (ASSIST sessions). Manual dispatch runs are blocked
+# from submitting by the AUTO_SUBMIT guard in apply.mjs.
 on:
-  schedule:
-    - cron: '17,37,57 * * * *'   # every 20 min, offset from the scraper
   workflow_dispatch: {}
 
 concurrency:

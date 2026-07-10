@@ -1,6 +1,6 @@
-// Auto-apply worker: picks up queued applications from Supabase, fills and
-// submits each with Playwright, emails a status summary.
-// Run by .github/workflows/auto-apply.yml every 20 minutes.
+// Apply worker: picks up queued applications from Supabase, fills each with
+// Playwright, emails a status summary. Submission always requires a human in
+// the loop (ASSIST/HEADED session or explicit AUTO_SUBMIT=1).
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,6 +22,13 @@ const ASSIST = process.env.ASSIST === '1';
 const HEADED = process.env.HEADED === '1' || ASSIST;
 if (DRY_RUN) console.log('🧪 DRY RUN — nothing will be submitted or written back');
 if (ASSIST) console.log('🤝 ASSISTED SESSION — I fill, you submit each application by hand');
+
+// Every submission needs a human present: an assisted/headed session, or an
+// explicit AUTO_SUBMIT=1 opt-in. Refuse to run headless against real forms.
+if (!DRY_RUN && !ASSIST && !HEADED && process.env.AUTO_SUBMIT !== '1') {
+  console.log('⛔ Unattended run — refusing to submit. Use ASSIST=1 (you click submit), DRY_RUN=1, or set AUTO_SUBMIT=1 to override.');
+  process.exit(0);
+}
 
 const sb = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false },
