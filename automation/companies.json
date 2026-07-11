@@ -25,5 +25,18 @@
     "modal", "notion", "openai", "perplexity", "physicalintelligence", "pika",
     "posthog", "ramp", "replit", "runway", "sierra", "suno", "supabase",
     "temporal", "vanta", "warp"
+  ],
+  "_workday_comment": "Discovery-only (bot can't fill Workday): entries are <tenant>.<wdN>/<site> from the company's myworkdayjobs.com URL, verified live.",
+  "workday": [
+    "adobe.wd5/external_experienced",
+    "blueorigin.wd5/BlueOrigin",
+    "boeing.wd1/EXTERNAL_CAREERS",
+    "capitalone.wd12/Capital_One",
+    "disney.wd5/disneycareer",
+    "intel.wd1/External",
+    "ngc.wd1/Northrop_Grumman_External_Site",
+    "nrel.wd5/NLR",
+    "nvidia.wd5/NVIDIAExternalCareerSite",
+    "salesforce.wd12/External_Career_Site"
   ]
 }

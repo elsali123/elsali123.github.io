@@ -2,7 +2,7 @@
 // email a digest of anything new. Run by .github/workflows/job-scraper.yml.
 import { readFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
-import { fetchSimplify, fetchGreenhouse, fetchLever, fetchAshby } from './lib/sources.mjs';
+import { fetchSimplify, fetchGreenhouse, fetchLever, fetchAshby, fetchWorkday } from './lib/sources.mjs';
 import { env, sendEmail, esc, isUSLocation } from './lib/util.mjs';
 
 const DASHBOARD_URL = 'https://elsali.dev/jobs.html';
@@ -18,6 +18,7 @@ const results = await Promise.allSettled([
   fetchGreenhouse(companies.greenhouse || []),
   fetchLever(companies.lever || []),
   fetchAshby(companies.ashby || []),
+  fetchWorkday(companies.workday || []),
 ]);
 const allRows = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
 for (const r of results) if (r.status === 'rejected') console.warn('source failed:', r.reason);

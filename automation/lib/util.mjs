@@ -38,7 +38,14 @@ const US_NEGATIVE = new RegExp(
   'india|bangalore|bengaluru|hyderabad|mumbai|delhi|pune|chennai|gurgaon|noida|' +
   'singapore|japan|tokyo|china|shanghai|beijing|hong kong|taiwan|taipei|korea|seoul|' +
   'australia|sydney|melbourne|new zealand|israel|tel aviv|brazil|sao paulo|' +
-  'mexico city|argentina|colombia|dubai|uae|saudi|nigeria|south africa|kenya|egypt|emea|apac|latam)\\b',
+  'mexico city|argentina|colombia|dubai|uae|saudi|nigeria|south africa|kenya|egypt|emea|apac|latam|' +
+  // countries that show up on global Workday tenants
+  'malaysia|penang|vietnam|philippines|manila|indonesia|jakarta|thailand|bangkok|' +
+  'romania|bucharest|czech|prague|hungary|budapest|portugal|lisbon|finland|helsinki|' +
+  'denmark|copenhagen|norway|oslo|austria|vienna|costa rica|chile|santiago|peru|' +
+  'ukraine|kyiv|turkey|istanbul|russia|russian federation|moscow|' +
+  // bare "mexico" is safe: "New Mexico" hits US_POSITIVE first, which wins
+  'mexico|guadalajara|bulgaria|sofia|serbia|belgrade|croatia|zagreb|slovakia|bratislava|greece|athens)\\b',
   'i');
 
 // True if any listed location looks like the US; locations with no signal

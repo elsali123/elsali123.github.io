@@ -92,6 +92,47 @@ export async function fetchLever(companies) {
   return rows;
 }
 
+// ---------- Workday CXS search API (free, no key; discovery-only ATS) ----------
+// Entries look like "nvidia.wd5/NVIDIAExternalCareerSite" (host prefix / site).
+// Country facet ids vary by tenant, so search broadly and let the title
+// classifier + US location filter narrow it down. apply.mjs can't fill
+// Workday (per-company accounts), so these surface as apply-manually links.
+export async function fetchWorkday(tenants) {
+  const rows = [];
+  for (const entry of tenants) {
+    try {
+      const [host, site] = entry.split('/');
+      const tenant = host.split('.')[0];
+      const base = `https://${host}.myworkdayjobs.com`;
+      const seen = rows.length;
+      for (let offset = 0; offset < 300; offset += 20) {
+        const data = await fetchJson(`${base}/wday/cxs/${tenant}/${site}/jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appliedFacets: {}, limit: 20, offset, searchText: 'intern' }),
+        });
+        for (const j of data.jobPostings || []) {
+          const term = classifyPosting(j.title);
+          if (!term || !j.externalPath) continue;
+          rows.push({
+            source: 'workday', ats: 'workday',
+            external_id: `${tenant}/${j.bulletFields?.[0] || j.externalPath}`,
+            company: tenant, title: j.title,
+            locations: j.locationsText || '',
+            url: `${base}/${site}${j.externalPath}`,
+            term,
+            posted_at: null, // postedOn is relative text ("Posted 3 Days Ago")
+            raw: { tenant: entry, id: j.bulletFields?.[0] },
+          });
+        }
+        if (offset + 20 >= (data.total || 0)) break;
+      }
+      console.log(`workday: ${entry} → ${rows.length - seen} rows`);
+    } catch (e) { console.warn(`workday: skipping ${entry}: ${e.message}`); }
+  }
+  return rows;
+}
+
 // ---------- Ashby public posting API (free, no key) ----------
 export async function fetchAshby(boards) {
   const rows = [];
