@@ -10,6 +10,7 @@ import { classifyPosting, detectAts, fetchJson, TARGET_TERMS } from './util.mjs'
 const SIMPLIFY_REPOS = [
   'SimplifyJobs/Summer2027-Internships',
   'SimplifyJobs/Summer2026-Internships',
+  'vanshb03/Summer2026-Internships',
 ];
 
 export async function fetchSimplify() {

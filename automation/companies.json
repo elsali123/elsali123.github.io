@@ -1,23 +1,29 @@
 {
   "_comment": "Company boards polled hourly via free public ATS APIs. Every token below was verified live against its API. Add more: token comes from the company's boards.greenhouse.io/<token>, jobs.lever.co/<name>, or jobs.ashbyhq.com/<name> URL.",
   "greenhouse": [
-    "affirm", "airbnb", "airtable", "akunacapital", "anthropic", "asana",
-    "attentive", "brex", "cloudflare", "coinbase", "databricks", "datadog",
-    "discord", "doordashusa", "dropbox", "duolingo", "epicgames", "figma",
-    "flexport", "gusto", "imc", "instacart", "janestreet", "jumptrading",
-    "kodiak", "lyft", "mongodb", "neuralink", "nuro", "okta", "optiverus",
-    "pinterest", "point72", "reddit", "robinhood", "roblox", "samsara",
-    "scaleai", "spacex", "squarepointcapital", "squarespace", "stripe",
-    "towerresearchcapital", "twilio", "vercel", "verkada", "virtu", "waymo",
-    "wehrtyou"
+    "affirm", "airbnb", "airtable", "akunacapital", "andurilindustries",
+    "anthropic", "asana", "astranis", "attentive", "aurorainnovation", "block",
+    "brex", "cloudflare", "coinbase", "databricks", "datadog", "discord",
+    "doordashusa", "dropbox", "drweng", "duolingo", "elastic", "epicgames",
+    "figma", "figureai", "fiveringsllc", "flexport", "flyzipline", "gitlab",
+    "gleanwork", "gusto", "imc", "instacart", "janestreet", "jumptrading",
+    "kodiak", "lyft", "maymobility", "mongodb", "motional", "neuralink",
+    "nuro", "okta", "optiverus", "pinterest", "planetlabs", "point72",
+    "purestorage", "reddit", "relativity", "robinhood", "roblox", "rocketlab",
+    "sambanovasystems", "samsara", "scaleai", "spacex", "squarepointcapital",
+    "squarespace", "stripe", "togetherai", "torcrobotics",
+    "towerresearchcapital", "tenstorrent", "twilio", "vercel", "verkada",
+    "virtu", "waymo", "wehrtyou", "xai"
   ],
   "lever": [
-    "mistral", "netflix", "nominal", "palantir", "plaid", "saronic",
-    "spotify", "voleon", "waabi", "zoox"
+    "dexterity", "mistral", "netflix", "nominal", "palantir", "plaid",
+    "saronic", "shieldai", "spotify", "voleon", "waabi", "zoox"
   ],
   "ashby": [
-    "cohere", "cursor", "deel", "docker", "elevenlabs", "linear", "mercury",
-    "modal", "notion", "openai", "perplexity", "posthog", "ramp", "replit",
-    "runway", "sierra", "suno", "supabase", "vanta"
+    "browserbase", "cohere", "cursor", "decagon", "deel", "docker",
+    "elevenlabs", "etched", "harvey", "langchain", "linear", "mercury",
+    "modal", "notion", "openai", "perplexity", "physicalintelligence", "pika",
+    "posthog", "ramp", "replit", "runway", "sierra", "suno", "supabase",
+    "temporal", "vanta", "warp"
   ]
 }

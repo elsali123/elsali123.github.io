@@ -27,12 +27,14 @@ const rows = allRows.filter((r) => isUSLocation(r.locations));
 console.log(`US filter: ${allRows.length} → ${rows.length} rows`);
 
 // Dedupe within this run (same job can appear via Simplify AND the direct API;
-// prefer the direct-API row since its external_id is stabler).
+// prefer the direct-API row since its external_id is stabler). Between two
+// simplify-format repos, keep the FIRST (SimplifyJobs) row so it upserts onto
+// the external_ids already stored from earlier runs instead of duplicating.
 const byKey = new Map();
 for (const row of rows) {
   const key = row.url.replace(/[?#].*$/, '').replace(/\/$/, '').toLowerCase();
   const existing = byKey.get(key);
-  if (!existing || existing.source === 'simplify') byKey.set(key, row);
+  if (!existing || (existing.source === 'simplify' && row.source !== 'simplify')) byKey.set(key, row);
 }
 const deduped = [...byKey.values()];
 console.log(`Fetched ${rows.length} rows → ${deduped.length} after dedupe`);
