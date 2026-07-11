@@ -57,7 +57,9 @@ async function resolveAnswer(label, options, profile, job, answers) {
   }
   const saved = savedAnswer(label, profile.common_answers);
   if (saved) return matchOption(saved, options) ?? saved;
+  const t = Date.now();
   const llm = await llmAnswer(label, options, profile, job);
+  console.log(`    ⏱ LLM ${((Date.now() - t) / 1000).toFixed(1)}s — ${label.slice(0, 60)}`);
   answers[label] = `${llm} (AI)`;
   return llm;
 }
@@ -131,6 +133,9 @@ async function gotoForm(page, job) {
     }
   }
   await page.waitForSelector('input, textarea, select', { timeout: 15000 });
+  // Cookie banners (OneTrust & co.) swallow the first click on Attach.
+  await page.locator('#onetrust-accept-btn-handler, button:has-text("Accept all")').first()
+    .click({ timeout: 1500 }).catch(() => {});
 }
 
 // react-select combobox (Greenhouse's new boards): open the menu, offer the
@@ -384,7 +389,13 @@ async function repairRequired(page, job, profile, files, answers) {
 
 export async function fillAndSubmit(page, job, profile, files, opts = {}) {
   const answers = {};
+  let tPhase = Date.now();
+  const mark = (phase) => {
+    console.log(`  ⏱ ${phase}: ${((Date.now() - tPhase) / 1000).toFixed(1)}s`);
+    tPhase = Date.now();
+  };
   await gotoForm(page, job);
+  mark('open page → form ready');
 
   if (await hasCaptcha(page)) {
     return { status: 'needs_review', detail: 'CAPTCHA on form — apply manually', answers };
@@ -405,29 +416,57 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
     else if (/cover/.test(section)) continue;                       // no cover letter file
     else if (/resume|cv/.test(section) || i === 0) { file = files.resume; tag = 'resume.pdf'; }
     if (!file) continue;
+    const tUpload = Date.now();
     // Chooser-first: React ATS uploaders (Greenhouse job-boards) ignore
     // programmatic input changes — only the Attach-button file dialog triggers
     // their real upload pipeline.
-    const chipShown = () => page.getByText(tag, { exact: false }).first()
-      .waitFor({ timeout: 15000 }).then(() => true).catch(() => false);
+    // Attachment proof polls instead of one flat wait, so success returns in
+    // ~a second: the filename anywhere on the page, or (for widgets that
+    // rename the file) document-like text near the input — the same heuristic
+    // auditRequired trusts.
+    const chipShown = async (timeout = 15000) => {
+      const deadline = Date.now() + timeout;
+      while (Date.now() < deadline) {
+        if (await page.getByText(tag, { exact: false }).first().isVisible().catch(() => false)) return true;
+        const near = await input.evaluate((n) => {
+          let c = n.parentElement;
+          for (let k = 0; k < 4 && c; k++, c = c.parentElement) {
+            if (/\.(pdf|docx?|txt|rtf)\b/i.test(c.innerText || '')) return true;
+          }
+          return false;
+        }).catch(() => false);
+        if (near) return true;
+        await page.waitForTimeout(500);
+      }
+      return false;
+    };
     let shown = false;
     const attach = page.locator(
       'button:has-text("Attach"), a[data-source="attach"], label:has-text("Attach")').nth(i);
     if (await attach.count().catch(() => 0)) {
-      const [chooser] = await Promise.all([
-        page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null),
-        attach.click({ timeout: 5000 }).catch(() => {}),
-      ]);
+      // React boards hydrate the Attach button late — a too-early click does
+      // nothing and the chooser never opens. Retry the hand-off a few times.
+      let chooser = null;
+      for (let tries = 0; tries < 3 && !chooser; tries++) {
+        [chooser] = await Promise.all([
+          page.waitForEvent('filechooser', { timeout: 3000 }).catch(() => null),
+          attach.click({ timeout: 3000 }).catch(() => {}),
+        ]);
+      }
       if (chooser) await chooser.setFiles(file).catch(() => {});
       if (chooser) shown = await chipShown();
     }
     if (!shown) {
       await input.setInputFiles(file).catch(() => {});
-      shown = await chipShown();
+      // Shorter second attempt — a failure here still gets one more shot in
+      // the audit/repair pass.
+      shown = await chipShown(8000);
     }
     answers[`file: ${tag}`] = shown ? 'attached ✓ (filename visible in form)' : 'FAILED to attach';
+    console.log(`    ⏱ upload ${tag}: ${((Date.now() - tUpload) / 1000).toFixed(1)}s${shown ? '' : ' (no chip!)'}`);
   }
   await page.waitForTimeout(3000); // let async upload / resume-parse prefill run
+  mark('file uploads + prefill wait');
 
   // ---- Text inputs & textareas ----
   const textFields = page.locator(
@@ -450,6 +489,7 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
     const finalVal = await el.inputValue().catch(() => '');
     answers[label] ??= finalVal ? finalVal : `${value} (NOT ACCEPTED by widget)`;
   }
+  mark('text fields');
 
   // ---- Native selects ----
   const selects = page.locator('select');
@@ -479,6 +519,7 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
     const ok = await el.inputValue().catch(() => '');
     answers[label] ??= ok ? picked : `${picked} (NOT ACCEPTED by widget)`;
   }
+  mark('native selects');
 
   // ---- Radio / checkbox groups (yes-no style questions) ----
   const groups = await page.locator('fieldset:has(input[type="radio"]), [role="radiogroup"]').all();
@@ -493,6 +534,7 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
     await group.locator(`label:has-text("${picked.replace(/"/g, '\\"')}")`).first().click().catch(() => {});
     answers[label] ??= picked;
   }
+  mark('radio/checkbox groups');
 
   // ---- Audit + repair pass for stubborn widgets (select2, custom uploaders) ----
   let missing = await auditRequired(page);
@@ -501,6 +543,7 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
     missing = await auditRequired(page);
   }
   if (missing.length) answers['⚠ STILL EMPTY (required)'] = missing.join(' | ');
+  mark('audit + repair');
 
 
   if (await hasCaptcha(page)) {
