@@ -120,7 +120,9 @@ for (const app of queue) {
   const page = await ctx.newPage();
   try {
     // ASSIST fills but never auto-submits (dryRun stops before the submit click).
-    let r = await fillAndSubmit(page, job, entry.profile, entry.files, { dryRun: DRY_RUN || ASSIST });
+    // interactive: a human is watching and can solve CAPTCHAs mid-fill.
+    let r = await fillAndSubmit(page, job, entry.profile, entry.files,
+      { dryRun: DRY_RUN || ASSIST, interactive: HEADED });
     // Hand-submission hold: in ASSIST for every app, otherwise only when a
     // headed real run got blocked (CAPTCHA) — watch for the confirmation page.
     const needsHuman = (ASSIST && (r.status === 'dry_run' || r.status === 'needs_review'))

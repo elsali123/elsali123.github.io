@@ -65,11 +65,15 @@ async function resolveAnswer(label, options, profile, job, answers) {
 }
 
 // Snap a desired value onto the closest option string, if options exist.
+// Whole-word containment only — "No" must never match the "no" inside
+// "Yes, I will need sponsorship support NOw".
 function matchOption(value, options) {
   if (!options?.length) return null;
-  const v = String(value).toLowerCase();
-  return options.find((o) => o.toLowerCase() === v)
-      || options.find((o) => o.toLowerCase().includes(v) || v.includes(o.toLowerCase()))
+  const norm = (s) => String(s).toLowerCase().trim();
+  const v = norm(value);
+  const rex = (s) => new RegExp(`(^|[^a-z0-9])${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`);
+  return options.find((o) => norm(o) === v)
+      || options.find((o) => rex(v).test(norm(o)) || rex(norm(o)).test(v))
       || null;
 }
 
@@ -101,8 +105,26 @@ async function hasCaptcha(page) {
   for (let i = 0; i < await boxes.count(); i++) {
     const el = boxes.nth(i);
     if (!(await el.isVisible().catch(() => false))) continue;
+    // The floating "protected by reCAPTCHA" badge (256×60, bottom corner) is
+    // invisible mode, not a challenge — don't let it abort the fill.
+    const badge = await el.evaluate((n) =>
+      !!n.closest('.grecaptcha-badge') || /size=invisible/.test(n.src || '')).catch(() => false);
+    if (badge) continue;
     const box = await el.boundingBox().catch(() => null);
-    if (box && box.width > 40 && box.height > 40) return true; // badge-sized = invisible mode
+    if (box && box.width > 40 && box.height > 40) return true;
+  }
+  return false;
+}
+
+// A real challenge in an attended session isn't fatal: the human solves it,
+// we fill as usual once it clears.
+async function waitForHumanCaptcha(page, opts) {
+  if (!opts.interactive) return false;
+  console.log("  🧩 CAPTCHA on the form — solve it in the browser and I'll start filling (waiting up to 5 min)…");
+  const deadline = Date.now() + 5 * 60_000;
+  while (Date.now() < deadline) {
+    if (!(await hasCaptcha(page))) return true;
+    await page.waitForTimeout(1500);
   }
   return false;
 }
@@ -397,7 +419,7 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
   await gotoForm(page, job);
   mark('open page → form ready');
 
-  if (await hasCaptcha(page)) {
+  if (await hasCaptcha(page) && !(await waitForHumanCaptcha(page, opts))) {
     return { status: 'needs_review', detail: 'CAPTCHA on form — apply manually', answers };
   }
 
