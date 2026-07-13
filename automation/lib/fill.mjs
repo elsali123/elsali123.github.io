@@ -433,11 +433,12 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
       const c = n.closest('[class*="field" i], [class*="question" i], [id*="resume" i], [id*="cover" i], [id*="transcript" i], div, li');
       return (c?.id || '') + ' ' + (c?.textContent || '').slice(0, 120);
     }).catch(() => ''))).toLowerCase();
-    let file = null, tag = null;
-    if (/transcript/.test(section) && files.transcript) { file = files.transcript; tag = 'transcript.pdf'; }
+    let file = null;
+    if (/transcript/.test(section) && files.transcript) file = files.transcript;
     else if (/cover/.test(section)) continue;                       // no cover letter file
-    else if (/resume|cv/.test(section) || i === 0) { file = files.resume; tag = 'resume.pdf'; }
+    else if (/resume|cv/.test(section) || i === 0) file = files.resume;
     if (!file) continue;
+    const tag = file.split(/[\\/]/).pop(); // uploaded basename, e.g. Elsa_Li_Resume.pdf
     const tUpload = Date.now();
     // Chooser-first: React ATS uploaders (Greenhouse job-boards) ignore
     // programmatic input changes — only the Attach-button file dialog triggers

@@ -68,9 +68,11 @@ async function getProfile(userId) {
     await writeFile(file, Buffer.from(await data.arrayBuffer()));
     return file;
   };
-  const files = { resume: await dl(p.resume_path, 'resume.pdf') };
+  // Recruiters see the filename — "Elsa_Li_Resume.pdf" beats "resume.pdf".
+  const prefix = (p.full_name || 'My').trim().replace(/\s+/g, '_');
+  const files = { resume: await dl(p.resume_path, `${prefix}_Resume.pdf`) };
   if (p.transcript_path) {
-    try { files.transcript = await dl(p.transcript_path, 'transcript.pdf'); }
+    try { files.transcript = await dl(p.transcript_path, `${prefix}_Transcript.pdf`); }
     catch (e) { console.warn(e.message); }
   }
 

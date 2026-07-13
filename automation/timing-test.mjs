@@ -18,7 +18,7 @@ const { data: profile } = await sb.from('job_profile').select('*').limit(1).sing
 
 const dir = await mkdtemp(join(tmpdir(), 'timing-test-'));
 const { data: pdf } = await sb.storage.from('job-docs').download(profile.resume_path);
-const resume = join(dir, 'resume.pdf');
+const resume = join(dir, `${(profile.full_name || 'My').trim().replace(/\s+/g, '_')}_Resume.pdf`);
 await writeFile(resume, Buffer.from(await pdf.arrayBuffer()));
 
 const t0 = Date.now();
