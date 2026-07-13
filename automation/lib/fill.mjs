@@ -17,6 +17,9 @@ const STANDARD = [
   [/github/i, (p) => p.github],
   [/portfolio|website|personal\s*site/i, (p) => p.website],
   [/current\s*(location|city)|^location|where.*(located|based)/i, (p) => p.location],
+  // Plain "Country" = country of residence. Citizenship/nationality questions
+  // stay with the LLM — the profile doesn't store citizenship.
+  [/\bcountry\b(?!.*(citizen|national))/i, () => 'United States'],
   [/school|university|college|institution/i, (p) => p.school],
   [/degree\s*(type|level)?$/i, (p) => p.degree],
   [/major|discipline|field\s*of\s*study|concentration/i, (p) => p.major],
@@ -447,10 +450,13 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
     // ~a second: the filename anywhere on the page, or (for widgets that
     // rename the file) document-like text near the input — the same heuristic
     // auditRequired trusts.
+    // Widgets truncate long filenames in the chip — match a prefix of the
+    // basename, not the whole thing.
+    const tagStart = tag.slice(0, 12);
     const chipShown = async (timeout = 15000) => {
       const deadline = Date.now() + timeout;
       while (Date.now() < deadline) {
-        if (await page.getByText(tag, { exact: false }).first().isVisible().catch(() => false)) return true;
+        if (await page.getByText(tagStart, { exact: false }).first().isVisible().catch(() => false)) return true;
         const near = await input.evaluate((n) => {
           let c = n.parentElement;
           for (let k = 0; k < 4 && c; k++, c = c.parentElement) {
@@ -480,7 +486,9 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
       if (chooser) shown = await chipShown();
     }
     if (!shown) {
-      await input.setInputFiles(file).catch(() => {});
+      // Explicit timeout: Greenhouse replaces the input node after uploads,
+      // and a detached target otherwise stalls for Playwright's 30s default.
+      await input.setInputFiles(file, { timeout: 3000 }).catch(() => {});
       // Shorter second attempt — a failure here still gets one more shot in
       // the audit/repair pass.
       shown = await chipShown(8000);
