@@ -158,6 +158,9 @@ async function gotoForm(page, job) {
     }
   }
   await page.waitForSelector('input, textarea, select', { timeout: 15000 });
+  // React boards paint before they hydrate; a pre-hydration click on Attach
+  // does nothing. 'load' means the bundles at least arrived.
+  await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
   // Cookie banners (OneTrust & co.) swallow the first click on Attach.
   await page.locator('#onetrust-accept-btn-handler, button:has-text("Accept all")').first()
     .click({ timeout: 1500 }).catch(() => {});
@@ -456,7 +459,11 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
     const chipShown = async (timeout = 15000) => {
       const deadline = Date.now() + timeout;
       while (Date.now() < deadline) {
-        if (await page.getByText(tagStart, { exact: false }).first().isVisible().catch(() => false)) return true;
+        // innerText covers any visible node (no .first()-lands-on-a-hidden-
+        // match trap); input values cover read-only filename fields.
+        if (await page.evaluate((needle) => document.body.innerText.includes(needle)
+            || [...document.querySelectorAll('input')].some((i) => (i.value || '').includes(needle)),
+        tagStart).catch(() => false)) return true;
         const near = await input.evaluate((n) => {
           let c = n.parentElement;
           for (let k = 0; k < 4 && c; k++, c = c.parentElement) {
@@ -476,12 +483,14 @@ export async function fillAndSubmit(page, job, profile, files, opts = {}) {
       // React boards hydrate the Attach button late — a too-early click does
       // nothing and the chooser never opens. Retry the hand-off a few times.
       let chooser = null;
-      for (let tries = 0; tries < 3 && !chooser; tries++) {
+      for (let tries = 0; tries < 4 && !chooser; tries++) {
+        if (tries) await page.waitForTimeout(1500); // hydration may lag first paint
         [chooser] = await Promise.all([
           page.waitForEvent('filechooser', { timeout: 3000 }).catch(() => null),
           attach.click({ timeout: 3000 }).catch(() => {}),
         ]);
       }
+      if (!chooser) console.log(`    ⚠ Attach button never opened a file chooser (${tag})`);
       if (chooser) await chooser.setFiles(file).catch(() => {});
       if (chooser) shown = await chipShown();
     }
