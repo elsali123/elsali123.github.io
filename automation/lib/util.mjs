@@ -60,6 +60,31 @@ export function isUSLocation(locations) {
   return judged.includes(true) || !judged.includes(false);
 }
 
+// Q→A map from earlier applications to the same company (newest wins).
+// Company names vary by source ("jumptrading" vs "Jump Trading"), so compare
+// lowercase alphanumerics. Meta entries (files, audit warnings, rejected
+// values) are skipped — the point is reusing real answers, LLM ones included.
+export async function loadPriorAnswers(sb, job, excludeId) {
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const { data, error } = await sb.from('applications')
+    .select('id, answers, job:job_postings(company)')
+    .not('answers', 'is', null)
+    .order('updated_at', { ascending: true })
+    .limit(100);
+  if (error) { console.warn('prior answers lookup failed:', error.message); return {}; }
+  const out = {};
+  for (const row of data || []) {
+    if (row.id === excludeId || norm(row.job?.company) !== norm(job.company)) continue;
+    for (const [q, v] of Object.entries(row.answers || {})) {
+      const val = String(v ?? '').replace(/\s*\((AI|reused)\)\s*$/, '').trim();
+      if (/^file( repair)?:|^⚠/.test(q)) continue;
+      if (!val || /NOT ACCEPTED|repair failed/i.test(val)) continue;
+      out[q] = val;
+    }
+  }
+  return out;
+}
+
 export function detectAts(url) {
   const u = (url || '').toLowerCase();
   // gh_jid= marks a Greenhouse board embedded in a company's own site

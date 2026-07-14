@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { fillAndSubmit } from './lib/fill.mjs';
-import { env, sendEmail, esc, detectAts } from './lib/util.mjs';
+import { env, sendEmail, esc, detectAts, loadPriorAnswers } from './lib/util.mjs';
 
 const MAX_PER_RUN = Number(process.env.MAX_APPLICATIONS_PER_RUN || 8);
 const SUPPORTED_ATS = new Set(['greenhouse', 'lever', 'ashby']);
@@ -46,9 +46,11 @@ console.log(`Processing ${queue.length} queued application(s)`);
 
 async function setStatus(id, status, detail, answers) {
   if (DRY_RUN) return;
-  const { error } = await sb.from('applications')
-    .update({ status, detail: detail?.slice(0, 500) ?? null, answers: answers ?? null, updated_at: new Date().toISOString() })
-    .eq('id', id);
+  // Leave stored answers alone unless this update carries new ones — the
+  // 'applying' transition used to wipe them, killing cross-application reuse.
+  const patch = { status, detail: detail?.slice(0, 500) ?? null, updated_at: new Date().toISOString() };
+  if (answers !== undefined) patch.answers = answers;
+  const { error } = await sb.from('applications').update(patch).eq('id', id);
   if (error) console.warn('status update failed:', error.message);
 }
 
@@ -115,6 +117,10 @@ for (const app of queue) {
     console.log(`  → skipped: unsupported ATS (${job.ats})`);
     continue;
   }
+
+  // Answers already given to this company (earlier applications, this run's
+  // included) get reused before asking the LLM again.
+  job.priorAnswers = await loadPriorAnswers(sb, job, app.id).catch(() => ({}));
 
   // Tall viewport helps headless screenshots; a screen-sized one is used when
   // a human is watching (HEADED) so window scrolling behaves normally.

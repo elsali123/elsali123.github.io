@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
 import { fillAndSubmit } from './lib/fill.mjs';
-import { env } from './lib/util.mjs';
+import { env, loadPriorAnswers } from './lib/util.mjs';
 
 const sb = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false },
@@ -15,6 +15,8 @@ const sb = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
 const { data: job } = await sb.from('job_postings').select('*')
   .eq('id', process.env.JOB_ID || '601c3ed3-2d00-4340-bbf6-45858347040c').single();
 const { data: profile } = await sb.from('job_profile').select('*').limit(1).single();
+job.priorAnswers = await loadPriorAnswers(sb, job, null);
+console.log('prior answers for', job.company + ':', Object.keys(job.priorAnswers).length);
 
 const dir = await mkdtemp(join(tmpdir(), 'timing-test-'));
 const { data: pdf } = await sb.storage.from('job-docs').download(profile.resume_path);

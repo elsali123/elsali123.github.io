@@ -60,6 +60,14 @@ async function resolveAnswer(label, options, profile, job, answers) {
   }
   const saved = savedAnswer(label, profile.common_answers);
   if (saved) return matchOption(saved, options) ?? saved;
+  // Same question answered for this company before? Reuse it — consistent
+  // across applications and skips an LLM call.
+  const prior = savedAnswer(label, job.priorAnswers);
+  if (prior) {
+    console.log(`    ♻ reused — ${label.slice(0, 60)}`);
+    answers[label] = `${prior} (reused)`;
+    return matchOption(prior, options) ?? prior;
+  }
   const t = Date.now();
   const llm = await llmAnswer(label, options, profile, job);
   console.log(`    ⏱ LLM ${((Date.now() - t) / 1000).toFixed(1)}s — ${label.slice(0, 60)}`);
