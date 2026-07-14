@@ -97,12 +97,14 @@ async function getProfile(userId) {
 // ---- Work the queue ----
 const browser = await chromium.launch({ headless: !HEADED, slowMo: HEADED ? 120 : 0 });
 const results = [];
-for (const app of queue) {
+for (const [idx, app] of queue.entries()) {
   const job = app.job;
   // Recompute ATS from the URL in case the stored value predates detector fixes.
   if (!SUPPORTED_ATS.has(job.ats)) job.ats = detectAts(job.url);
   const tag = `${job.company} — ${job.title}`;
-  console.log(`\n▶ ${tag} (${job.ats})`);
+  const left = queue.length - idx - 1;
+  console.log(`\n▶ [${idx + 1}/${queue.length}] ${tag} (${job.ats})`
+    + (left ? ` — ${left} more after this` : ' — last one!'));
   await setStatus(app.id, 'applying');
 
   const entry = await getProfile(app.user_id).catch((e) => { console.warn(e.message); return null; });
