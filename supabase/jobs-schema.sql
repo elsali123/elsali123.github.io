@@ -59,14 +59,17 @@ create table if not exists job_profile (
 );
 
 -- ---------- Row Level Security ----------
--- Per-user notes on a job ("only one internship application allowed", …).
+-- Per-user notes + category on a job.
+-- category: null | 'not_interested' | 'one_app_only'
 create table if not exists job_notes (
   user_id    uuid not null references auth.users(id) on delete cascade,
   job_id     uuid not null references job_postings(id) on delete cascade,
   note       text,
+  category   text,
   updated_at timestamptz default now(),
   primary key (user_id, job_id)
 );
+alter table job_notes add column if not exists category text;
 
 alter table job_postings enable row level security;
 alter table applications enable row level security;

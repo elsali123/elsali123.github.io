@@ -124,9 +124,11 @@ for (const [idx, app] of queue.entries()) {
   // included) get reused before asking the LLM again.
   job.priorAnswers = await loadPriorAnswers(sb, job, app.id).catch(() => ({}));
 
-  // Surface the user's note on this job right when it matters.
-  const { data: noteRow } = await sb.from('job_notes').select('note')
+  // Surface the user's note/category on this job right when it matters.
+  const { data: noteRow } = await sb.from('job_notes').select('note, category')
     .eq('user_id', app.user_id).eq('job_id', app.job_id).maybeSingle();
+  if (noteRow?.category === 'one_app_only') console.log('  ☝️ NOTE: this company allows only ONE application — make it count!');
+  if (noteRow?.category === 'not_interested') console.log('  🚫 marked "no longer interested" — consider skipping this one');
   if (noteRow?.note) console.log(`  📝 your note: ${noteRow.note}`);
 
   // Tall viewport helps headless screenshots; a screen-sized one is used when

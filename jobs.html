@@ -75,6 +75,7 @@
     background: rgba(149,117,205,.12); color: var(--purple-deep); margin-right: 5px; font-weight: 500; }
   .chip.new { background: rgba(46,125,50,.12); color: var(--green); }
   .chip.manual { background: rgba(255,152,0,.18); color: var(--amber); font-weight: 600; }
+  .chip.dismiss { background: rgba(120,120,130,.14); color: #6d6577; font-weight: 600; }
   .card.manual-apply { border-left: 4px solid rgba(255,152,0,.55); }
   .jobnote { font-size: 12.5px; color: var(--amber); background: rgba(255,193,7,.1);
     border-radius: 10px; padding: 6px 10px; margin-top: 6px; }
@@ -169,6 +170,7 @@
           <option value="7">Last 7 days</option>
         </select>
         <label class="switch" style="margin:0"><input type="checkbox" id="fHideApplied" onchange="renderJobs()" style="width:auto"> hide queued/applied</label>
+        <label class="switch" style="margin:0"><input type="checkbox" id="fShowDismissed" onchange="renderJobs()" style="width:auto"> show dismissed</label>
       </div>
       <div id="jobList"></div>
     </section>
@@ -300,47 +302,78 @@ async function loadAll() {
   if (j.error || a.error || p.error) { toast('Load failed: ' + (j.error||a.error||p.error).message); return; }
   jobs = j.data || []; apps = a.data || []; profile = p.data;
   // Notes are non-fatal: the table may not exist until the schema update runs.
-  const n = await sb.from('job_notes').select('job_id, note');
+  const n = await sb.from('job_notes').select('job_id, note, category');
   notes = {};
-  if (!n.error) for (const r of n.data || []) notes[r.job_id] = r.note;
+  if (!n.error) for (const r of n.data || []) notes[r.job_id] = { note: r.note, category: r.category };
   else console.warn('job_notes unavailable (run the schema update):', n.error.message);
   renderJobs(); renderApps(); fillProfileForm();
   $('profileWarning').style.display = (profile?.resume_path && profile?.full_name) ? 'none' : 'block';
 }
 
-// ---------- job notes ----------
+// ---------- job notes & categories ----------
+const CATEGORIES = {
+  not_interested: '<span class="chip dismiss">🚫 not interested</span>',
+  one_app_only: '<span class="chip manual">☝️ one application only</span>',
+};
 function noteBlock(jobId) {
   if (editingNote === jobId) {
+    const cur = notes[jobId] || {};
+    const sel = (v) => cur.category === v ? ' selected' : '';
     return `<div class="notebox">
       <textarea id="noteText_${jobId}" rows="2"
-        placeholder="e.g. only one internship application allowed per season">${esc(notes[jobId] || '')}</textarea>
-      <div style="display:flex;gap:6px;margin-top:6px">
-        <button class="ghost" onclick="saveNote('${jobId}')">Save note</button>
+        placeholder="e.g. only one internship application allowed per season">${esc(cur.note || '')}</textarea>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+        <select id="noteCat_${jobId}" style="width:auto">
+          <option value="">no category</option>
+          <option value="not_interested"${sel('not_interested')}>🚫 no longer interested</option>
+          <option value="one_app_only"${sel('one_app_only')}>☝️ one application only</option>
+        </select>
+        <button class="ghost" onclick="saveNote('${jobId}')">Save</button>
         <button class="ghost" onclick="editingNote=null;rerender()">Cancel</button>
       </div></div>`;
   }
   const n = notes[jobId];
-  return n ? `<div class="jobnote">📝 ${esc(n)}
-    <a href="#" onclick="editNote('${jobId}');return false">edit</a></div>` : '';
+  if (!n || (!n.note && !n.category)) return '';
+  return `<div class="jobnote">${CATEGORIES[n.category] || ''}${n.note ? ' 📝 ' + esc(n.note) : ''}
+    <a href="#" onclick="editNote('${jobId}');return false">edit</a></div>`;
 }
 function noteLink(jobId) {
-  return (notes[jobId] || editingNote === jobId) ? ''
+  const n = notes[jobId];
+  return ((n && (n.note || n.category)) || editingNote === jobId) ? ''
     : ` <a class="notelink" href="#" onclick="editNote('${jobId}');return false">📝 note</a>`;
 }
 function editNote(jobId) { editingNote = jobId; rerender(); }
 async function saveNote(jobId) {
   const note = $('noteText_' + jobId).value.trim();
+  const category = $('noteCat_' + jobId).value || null;
   editingNote = null;
-  if (!note) {
+  if (!note && !category) {
     await sb.from('job_notes').delete().eq('user_id', user.id).eq('job_id', jobId);
     delete notes[jobId];
   } else {
     const { error } = await sb.from('job_notes')
-      .upsert({ user_id: user.id, job_id: jobId, note, updated_at: new Date().toISOString() });
-    if (error) { toast('Note save failed: ' + error.message); rerender(); return; }
-    notes[jobId] = note;
+      .upsert({ user_id: user.id, job_id: jobId, note: note || null, category, updated_at: new Date().toISOString() });
+    if (error) {
+      toast(/job_notes|schema cache/i.test(error.message)
+        ? 'Notes table missing — run the schema SQL in Supabase first ⚠️'
+        : 'Note save failed: ' + error.message);
+      rerender(); return;
+    }
+    notes[jobId] = { note: note || null, category };
   }
   rerender();
+}
+// Companies where any job carries "one application only" — the warning
+// belongs to the whole company, not just the job it was set on.
+const normCo = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function oneAppCompanies() {
+  const set = new Set();
+  for (const [jid, n] of Object.entries(notes)) {
+    if (n.category !== 'one_app_only') continue;
+    const co = jobs.find((x) => x.id === jid)?.company || apps.find((x) => x.job_id === jid)?.job?.company;
+    if (co) set.add(normCo(co));
+  }
+  return set;
 }
 function rerender() { renderJobs(); renderApps(); }
 
@@ -354,23 +387,30 @@ function renderJobs() {
   const cutoff = age ? Date.now() - Number(age) * 864e5 : 0;
   const dayAgo = Date.now() - 864e5;
 
+  const showDismissed = $('fShowDismissed').checked;
+  const oneAppCos = oneAppCompanies();
+
   const list = jobs.filter(j =>
     (!q || (j.company + ' ' + j.title).toLowerCase().includes(q)) &&
     (!term || j.term === term) &&
     (!cutoff || new Date(j.first_seen).getTime() > cutoff) &&
-    (!hide || !appliedJobIds.has(j.id)));
+    (!hide || !appliedJobIds.has(j.id)) &&
+    (showDismissed || notes[j.id]?.category !== 'not_interested'));
 
   $('jobCount').textContent = list.length;
   $('jobList').innerHTML = list.length ? list.map(j => {
     const isNew = new Date(j.first_seen).getTime() > dayAgo;
     const queued = appliedJobIds.has(j.id);
-    return `<div class="card job">
+    const dismissed = notes[j.id]?.category === 'not_interested';
+    const coWarn = oneAppCos.has(normCo(j.company)) && notes[j.id]?.category !== 'one_app_only'
+      ? '<span class="chip manual">☝️ one app only at this company</span>' : '';
+    return `<div class="card job"${dismissed ? ' style="opacity:.55"' : ''}>
       <div class="info">
         <h3><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.company)} — ${esc(j.title)}</a></h3>
         <div class="meta">
           ${isNew ? '<span class="chip new">new</span>' : ''}
           <span class="chip">${esc(j.term)}</span>
-          <span class="chip">${esc(j.ats)}</span>
+          <span class="chip">${esc(j.ats)}</span>${coWarn}
           ${j.locations ? `<span class="chip">${esc(j.locations.slice(0, 60))}</span>` : ''}
           <span>seen ${new Date(j.first_seen).toLocaleDateString()}</span>${noteLink(j.id)}
         </div>
@@ -512,7 +552,10 @@ function renderApps() {
       ${checkbox}
       <div class="info">
         <h3><a href="${esc(a.job?.url)}" target="_blank" rel="noopener">${esc(a.job?.company)} — ${esc(a.job?.title)}</a></h3>
-        <div class="meta">${esc(a.job?.term || '')}${manualChip} · updated ${new Date(a.updated_at).toLocaleString()}${noteLink(a.job_id)}</div>
+        <div class="meta">${esc(a.job?.term || '')}${manualChip}${
+          oneAppCompanies().has(normCo(a.job?.company)) && notes[a.job_id]?.category !== 'one_app_only'
+            ? ' <span class="chip manual">☝️ one app only at this company</span>' : ''
+        } · updated ${new Date(a.updated_at).toLocaleString()}${noteLink(a.job_id)}</div>
         ${noteBlock(a.job_id)}
         ${manualHint}
         ${a.detail ? `<div class="detail">${esc(a.detail)}</div>` : ''}
