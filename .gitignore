@@ -5,3 +5,4 @@ resume.txt
 automation/node_modules/
 automation/failure-*.png
 automation/.env.local
+automation/logs/

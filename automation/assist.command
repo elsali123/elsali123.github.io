@@ -9,10 +9,14 @@ if [ ! -f .env.local ]; then
   exit 1
 fi
 
+mkdir -p logs
+LOG="logs/assist-$(date +%Y%m%d-%H%M%S).txt"
+
 echo "🤝 Starting assisted application session…"
 echo "   I fill each application — YOU review and click submit."
+echo "   📝 log: automation/$LOG"
 echo
-ASSIST=1 node --env-file=.env.local apply.mjs
+ASSIST=1 node --env-file=.env.local apply.mjs 2>&1 | tee "$LOG"
 
 echo
-echo "Session finished — you can close this window."
+echo "Session finished — you can close this window. (log saved: automation/$LOG)"
