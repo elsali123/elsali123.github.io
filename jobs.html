@@ -323,16 +323,18 @@ function noteBlock(jobId) {
   if (editingNote === jobId) {
     const cur = notes[jobId] || {};
     const sel = (v) => cur.category === v ? ' selected' : '';
+    // No element ids here: the same job renders in BOTH tabs, and duplicate
+    // ids made getElementById read the hidden tab's empty editor on save.
     return `<div class="notebox">
-      <textarea id="noteText_${jobId}" rows="2"
+      <textarea rows="2"
         placeholder="e.g. only one internship application allowed per season">${esc(cur.note || '')}</textarea>
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
-        <select id="noteCat_${jobId}" style="width:auto">
+        <select style="width:auto">
           <option value="">no category</option>
           <option value="not_interested"${sel('not_interested')}>🚫 no longer interested</option>
           <option value="one_app_only"${sel('one_app_only')}>☝️ one application only</option>
         </select>
-        <button class="ghost" onclick="saveNote('${jobId}')">Save</button>
+        <button class="ghost" onclick="saveNote('${jobId}', this)">Save</button>
         <button class="ghost" onclick="editingNote=null;rerender()">Cancel</button>
       </div></div>`;
   }
@@ -347,9 +349,10 @@ function noteLink(jobId) {
     : ` <a class="notelink" href="#" onclick="editNote('${jobId}');return false">📝 note</a>`;
 }
 function editNote(jobId) { editingNote = jobId; rerender(); }
-async function saveNote(jobId) {
-  const note = $('noteText_' + jobId).value.trim();
-  const category = $('noteCat_' + jobId).value || null;
+async function saveNote(jobId, btn) {
+  const box = btn.closest('.notebox');
+  const note = box.querySelector('textarea').value.trim();
+  const category = box.querySelector('select').value || null;
   editingNote = null;
   if (!note && !category) {
     await sb.from('job_notes').delete().eq('user_id', user.id).eq('job_id', jobId);
