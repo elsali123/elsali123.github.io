@@ -548,7 +548,10 @@ async function uploadDoc(inputId, name, column) {
   const file = $(inputId).files[0];
   if (!file) return profile?.[column] ?? null;
   if (file.type !== 'application/pdf') { toast(name + ' must be a PDF'); throw new Error('not pdf'); }
-  const path = `${user.id}/${name}.pdf`;
+  // Store under the name recruiters see, e.g. Elsa_Li_Resume.pdf.
+  const prefix = ($('p_full_name').value.trim() || 'My').replace(/\s+/g, '_');
+  const nice = name === 'resume' ? 'Resume' : 'Transcript';
+  const path = `${user.id}/${prefix}_${nice}.pdf`;
   const { error } = await sb.storage.from('job-docs').upload(path, file, { upsert: true, contentType: 'application/pdf' });
   if (error) { toast(name + ' upload failed: ' + error.message); throw error; }
   return path;
