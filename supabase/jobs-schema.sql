@@ -59,9 +59,19 @@ create table if not exists job_profile (
 );
 
 -- ---------- Row Level Security ----------
+-- Per-user notes on a job ("only one internship application allowed", …).
+create table if not exists job_notes (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  job_id     uuid not null references job_postings(id) on delete cascade,
+  note       text,
+  updated_at timestamptz default now(),
+  primary key (user_id, job_id)
+);
+
 alter table job_postings enable row level security;
 alter table applications enable row level security;
 alter table job_profile  enable row level security;
+alter table job_notes    enable row level security;
 
 -- Any logged-in user can read the shared job feed; only the service
 -- role (scraper) writes it.
@@ -84,6 +94,11 @@ create policy "own applications" on applications
 
 drop policy if exists "own profile" on job_profile;
 create policy "own profile" on job_profile
+  for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own notes" on job_notes;
+create policy "own notes" on job_notes
   for all to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 

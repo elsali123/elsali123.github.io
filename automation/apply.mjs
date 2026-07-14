@@ -124,6 +124,11 @@ for (const [idx, app] of queue.entries()) {
   // included) get reused before asking the LLM again.
   job.priorAnswers = await loadPriorAnswers(sb, job, app.id).catch(() => ({}));
 
+  // Surface the user's note on this job right when it matters.
+  const { data: noteRow } = await sb.from('job_notes').select('note')
+    .eq('user_id', app.user_id).eq('job_id', app.job_id).maybeSingle();
+  if (noteRow?.note) console.log(`  📝 your note: ${noteRow.note}`);
+
   // Tall viewport helps headless screenshots; a screen-sized one is used when
   // a human is watching (HEADED) so window scrolling behaves normally.
   const ctx = await browser.newContext({ viewport: HEADED ? { width: 1200, height: 800 } : { width: 1280, height: 1600 } });

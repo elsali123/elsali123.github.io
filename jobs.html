@@ -76,6 +76,12 @@
   .chip.new { background: rgba(46,125,50,.12); color: var(--green); }
   .chip.manual { background: rgba(255,152,0,.18); color: var(--amber); font-weight: 600; }
   .card.manual-apply { border-left: 4px solid rgba(255,152,0,.55); }
+  .jobnote { font-size: 12.5px; color: var(--amber); background: rgba(255,193,7,.1);
+    border-radius: 10px; padding: 6px 10px; margin-top: 6px; }
+  .jobnote a { color: var(--muted); margin-left: 6px; font-size: 11.5px; }
+  .notelink { font-size: 12px; color: var(--muted); text-decoration: none; }
+  .notelink:hover { color: var(--pink); }
+  .notebox textarea { margin-top: 6px; font-size: 13px; }
   .status { font-size: 12px; font-weight: 600; padding: 3px 12px; border-radius: 999px; white-space: nowrap; }
   .status.staged       { background: rgba(166,149,175,.16); color: #7c6f87; }
   .status.ready        { background: rgba(149,117,205,.18); color: var(--purple-deep); }
@@ -247,6 +253,7 @@ const SUPABASE_URL = 'https://zyfzgezjusyfxmfuhvfk.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rpF1rLZ3Hrgjn4mPRILLCg_RmUf6C6n';
 
 let sb, user = null, jobs = [], apps = [], profile = null;
+let notes = {}, editingNote = null;   // job_id → note text; job_id being edited
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -292,9 +299,50 @@ async function loadAll() {
   ]);
   if (j.error || a.error || p.error) { toast('Load failed: ' + (j.error||a.error||p.error).message); return; }
   jobs = j.data || []; apps = a.data || []; profile = p.data;
+  // Notes are non-fatal: the table may not exist until the schema update runs.
+  const n = await sb.from('job_notes').select('job_id, note');
+  notes = {};
+  if (!n.error) for (const r of n.data || []) notes[r.job_id] = r.note;
+  else console.warn('job_notes unavailable (run the schema update):', n.error.message);
   renderJobs(); renderApps(); fillProfileForm();
   $('profileWarning').style.display = (profile?.resume_path && profile?.full_name) ? 'none' : 'block';
 }
+
+// ---------- job notes ----------
+function noteBlock(jobId) {
+  if (editingNote === jobId) {
+    return `<div class="notebox">
+      <textarea id="noteText_${jobId}" rows="2"
+        placeholder="e.g. only one internship application allowed per season">${esc(notes[jobId] || '')}</textarea>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="ghost" onclick="saveNote('${jobId}')">Save note</button>
+        <button class="ghost" onclick="editingNote=null;rerender()">Cancel</button>
+      </div></div>`;
+  }
+  const n = notes[jobId];
+  return n ? `<div class="jobnote">📝 ${esc(n)}
+    <a href="#" onclick="editNote('${jobId}');return false">edit</a></div>` : '';
+}
+function noteLink(jobId) {
+  return (notes[jobId] || editingNote === jobId) ? ''
+    : ` <a class="notelink" href="#" onclick="editNote('${jobId}');return false">📝 note</a>`;
+}
+function editNote(jobId) { editingNote = jobId; rerender(); }
+async function saveNote(jobId) {
+  const note = $('noteText_' + jobId).value.trim();
+  editingNote = null;
+  if (!note) {
+    await sb.from('job_notes').delete().eq('user_id', user.id).eq('job_id', jobId);
+    delete notes[jobId];
+  } else {
+    const { error } = await sb.from('job_notes')
+      .upsert({ user_id: user.id, job_id: jobId, note, updated_at: new Date().toISOString() });
+    if (error) { toast('Note save failed: ' + error.message); rerender(); return; }
+    notes[jobId] = note;
+  }
+  rerender();
+}
+function rerender() { renderJobs(); renderApps(); }
 
 // ---------- jobs tab ----------
 function renderJobs() {
@@ -324,8 +372,9 @@ function renderJobs() {
           <span class="chip">${esc(j.term)}</span>
           <span class="chip">${esc(j.ats)}</span>
           ${j.locations ? `<span class="chip">${esc(j.locations.slice(0, 60))}</span>` : ''}
-          <span>seen ${new Date(j.first_seen).toLocaleDateString()}</span>
+          <span>seen ${new Date(j.first_seen).toLocaleDateString()}</span>${noteLink(j.id)}
         </div>
+        ${noteBlock(j.id)}
       </div>
       <button class="primary" ${queued ? 'disabled' : ''} onclick="queueApply('${j.id}', this)">
         ${queued ? 'Queued ✓' : 'Apply'}</button>
@@ -463,7 +512,8 @@ function renderApps() {
       ${checkbox}
       <div class="info">
         <h3><a href="${esc(a.job?.url)}" target="_blank" rel="noopener">${esc(a.job?.company)} — ${esc(a.job?.title)}</a></h3>
-        <div class="meta">${esc(a.job?.term || '')}${manualChip} · updated ${new Date(a.updated_at).toLocaleString()}</div>
+        <div class="meta">${esc(a.job?.term || '')}${manualChip} · updated ${new Date(a.updated_at).toLocaleString()}${noteLink(a.job_id)}</div>
+        ${noteBlock(a.job_id)}
         ${manualHint}
         ${a.detail ? `<div class="detail">${esc(a.detail)}</div>` : ''}
         ${answers}
