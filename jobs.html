@@ -75,7 +75,6 @@
     background: rgba(149,117,205,.12); color: var(--purple-deep); margin-right: 5px; font-weight: 500; }
   .chip.new { background: rgba(46,125,50,.12); color: var(--green); }
   .chip.manual { background: rgba(255,152,0,.18); color: var(--amber); font-weight: 600; }
-  .chip.dismiss { background: rgba(120,120,130,.14); color: #6d6577; font-weight: 600; }
   .card.manual-apply { border-left: 4px solid rgba(255,152,0,.55); }
   .jobnote { font-size: 12.5px; color: var(--amber); background: rgba(255,193,7,.1);
     border-radius: 10px; padding: 6px 10px; margin-top: 6px; }
@@ -91,6 +90,8 @@
   .status.submitted    { background: rgba(76,175,80,.16); color: var(--green); }
   .status.needs_review { background: rgba(255,152,0,.16); color: var(--amber); }
   .status.failed       { background: rgba(198,40,40,.12); color: var(--red); }
+  .status.not_interested { background: rgba(120,120,130,.16); color: #6d6577; cursor: pointer; }
+  .status.one_app_only   { background: rgba(255,152,0,.16); color: var(--amber); cursor: pointer; }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .filters input, .filters select { width: auto; }
   .filters input[type="search"] { flex: 1; min-width: 160px; }
@@ -311,10 +312,13 @@ async function loadAll() {
 }
 
 // ---------- job notes & categories ----------
-const CATEGORIES = {
-  not_interested: '<span class="chip dismiss">🚫 not interested</span>',
-  one_app_only: '<span class="chip manual">☝️ one application only</span>',
-};
+// Category renders as a status-style pill (like submitted/staged); click to edit.
+function catPill(jobId) {
+  const c = notes[jobId]?.category;
+  if (!c) return '';
+  const label = c === 'not_interested' ? '🚫 not interested' : '☝️ one app only';
+  return `<span class="status ${c}" title="click to edit" onclick="editNote('${jobId}')">${label}</span>`;
+}
 function noteBlock(jobId) {
   if (editingNote === jobId) {
     const cur = notes[jobId] || {};
@@ -333,8 +337,8 @@ function noteBlock(jobId) {
       </div></div>`;
   }
   const n = notes[jobId];
-  if (!n || (!n.note && !n.category)) return '';
-  return `<div class="jobnote">${CATEGORIES[n.category] || ''}${n.note ? ' 📝 ' + esc(n.note) : ''}
+  if (!n?.note) return '';
+  return `<div class="jobnote">📝 ${esc(n.note)}
     <a href="#" onclick="editNote('${jobId}');return false">edit</a></div>`;
 }
 function noteLink(jobId) {
@@ -416,6 +420,7 @@ function renderJobs() {
         </div>
         ${noteBlock(j.id)}
       </div>
+      ${catPill(j.id)}
       <button class="primary" ${queued ? 'disabled' : ''} onclick="queueApply('${j.id}', this)">
         ${queued ? 'Queued ✓' : 'Apply'}</button>
     </div>`;
@@ -561,6 +566,7 @@ function renderApps() {
         ${a.detail ? `<div class="detail">${esc(a.detail)}</div>` : ''}
         ${answers}
       </div>
+      ${catPill(a.job_id)}
       <span class="status ${esc(a.status)}">${esc(a.status.replace('_', ' '))}</span>
       ${retry}${markDone}${remove}
     </div>`;
