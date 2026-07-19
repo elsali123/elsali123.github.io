@@ -90,6 +90,7 @@
   .status.submitted    { background: rgba(76,175,80,.16); color: var(--green); }
   .status.needs_review { background: rgba(255,152,0,.16); color: var(--amber); }
   .status.failed       { background: rgba(198,40,40,.12); color: var(--red); }
+  .status.abandoned    { background: rgba(120,120,130,.16); color: #6d6577; }
   .status.not_interested { background: rgba(120,120,130,.16); color: #6d6577; cursor: pointer; }
   .status.one_app_only   { background: rgba(255,152,0,.16); color: var(--amber); cursor: pointer; }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -179,7 +180,7 @@
     <!-- ============ APPLICATIONS TAB ============ -->
     <section id="tab-apps" style="display:none">
       <div class="note">📦 staged (in your cart) &nbsp;·&nbsp; 🚀 ready (released — fill via assisted session)
-        &nbsp;·&nbsp; ✅ submitted &nbsp;·&nbsp; 👀 needs review &nbsp;·&nbsp; ❌ failed</div>
+        &nbsp;·&nbsp; ✅ submitted &nbsp;·&nbsp; 👀 needs review &nbsp;·&nbsp; ❌ failed &nbsp;·&nbsp; 🗑 abandoned (gave up on it)</div>
       <div id="releaseBar" style="margin-bottom:12px"></div>
       <div id="appList"></div>
     </section>
@@ -547,10 +548,12 @@ function renderApps() {
       ? `<details class="answers"><summary class="meta">answers used (${Object.keys(a.answers).length})</summary><dl>` +
         Object.entries(a.answers).map(([q, v]) => `<dt>${esc(q)}</dt><dd>${esc(v)}</dd>`).join('') +
         '</dl></details>' : '';
-    const retry = (a.status === 'failed' || a.status === 'needs_review')
+    const retry = (a.status === 'failed' || a.status === 'needs_review' || a.status === 'abandoned')
       ? `<button class="ghost" onclick="retryApp('${a.id}')">Retry</button>` : '';
     const markDone = a.status !== 'submitted' && a.status !== 'applying'
       ? `<button class="ghost" onclick="markSubmitted('${a.id}')" title="I submitted this myself">✓ Mark submitted</button>` : '';
+    const abandon = a.status !== 'submitted' && a.status !== 'applying' && a.status !== 'abandoned'
+      ? `<button class="ghost" onclick="markAbandoned('${a.id}')" title="Giving up on this one — keep it for the record">🗑 Abandoned</button>` : '';
     const remove = a.status !== 'applying'
       ? `<button class="ghost" onclick="removeApp('${a.id}')">✕</button>` : '';
     const checkbox = a.status === 'staged'
@@ -571,7 +574,7 @@ function renderApps() {
       </div>
       ${catPill(a.job_id)}
       <span class="status ${esc(a.status)}">${esc(a.status.replace('_', ' '))}</span>
-      ${retry}${markDone}${remove}
+      ${retry}${markDone}${abandon}${remove}
     </div>`;
   }).join('') : '<div class="empty">Nothing queued yet — hit Apply on a job.</div>';
 }
@@ -605,6 +608,13 @@ async function releaseSelected() {
   if (error) return toast('Release failed: ' + error.message);
   toast(`Released ${ids.length} 🚀 — start the assisted session on your computer`);
   loadAll();
+}
+async function markAbandoned(id) {
+  const { error } = await sb.from('applications')
+    .update({ status: 'abandoned', detail: 'Marked abandoned', updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return toast('Failed: ' + error.message);
+  toast('Marked abandoned 🗑'); loadAll();
 }
 async function markSubmitted(id) {
   const { error } = await sb.from('applications')
