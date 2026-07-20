@@ -42,6 +42,55 @@ export async function fetchSimplify() {
   return rows;
 }
 
+// ---------- intern-list.com (public Airtable shared views) ----------
+// Each category tab embeds an Airtable shared view; the embed page carries a
+// freshly-signed data URL (urlWithParams). We read the SWE / Data / ML tabs.
+const INTERN_LIST_VIEWS = [
+  ['app17F0kkWQZhC6HB', 'shrOTtndhc6HSgnYb', 'swe'],
+  ['appbsiP1flCoaXCSm', 'shreRS1cFLbduwBaU', 'data'],
+  ['appjSXAWiVF4d1HoZ', 'shrf04yGbrK3IebAl', 'ml-ai'],
+];
+export async function fetchInternList() {
+  const rows = [];
+  for (const [app, shr, label] of INTERN_LIST_VIEWS) {
+    try {
+      const embed = await (await fetch(`https://airtable.com/embed/${app}/${shr}`,
+        { headers: { 'User-Agent': 'Mozilla/5.0' } })).text();
+      const m = embed.match(/urlWithParams: "([^"]+)"/);
+      if (!m) throw new Error('no signed data URL in embed page');
+      const data = await fetchJson('https://airtable.com' + JSON.parse(`"${m[1]}"`), {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'x-airtable-application-id': app,
+          'X-Requested-With': 'XMLHttpRequest', 'x-time-zone': 'America/New_York' },
+      });
+      const t = data.data.table;
+      const colName = Object.fromEntries(t.columns.map((c) => [c.id, c.name]));
+      const before = rows.length;
+      for (const r of t.rows || []) {
+        const cell = {};
+        for (const [cid, v] of Object.entries(r.cellValuesByColumnId || {})) cell[colName[cid]] = v;
+        const title = String(cell['Position Title'] || '').trim();
+        const url = cell['Apply']?.url;
+        const company = String(cell['Company'] || '').trim();
+        if (!title || !url || !company) continue;
+        // Hire Time comes as "2026-Fall" — normalize so the term classifier sees it.
+        const term = classifyPosting(title, String(cell['Hire Time'] || '').replace(/-/g, ' '));
+        if (!term) continue;
+        rows.push({
+          source: 'internlist', ats: detectAts(url),
+          external_id: r.id,
+          company, title,
+          locations: String(cell['Location'] || '').replace(/\s*\n\s*/g, '; '),
+          url, term,
+          posted_at: cell['Date'] ? new Date(cell['Date']).toISOString() : null,
+          raw: { view: label, id: r.id },
+        });
+      }
+      console.log(`internlist: ${label} → ${rows.length - before} target-term rows`);
+    } catch (e) { console.warn(`internlist: skipping ${label}: ${e.message}`); }
+  }
+  return rows;
+}
+
 // ---------- Greenhouse public board API (free, no key) ----------
 export async function fetchGreenhouse(boards) {
   const rows = [];

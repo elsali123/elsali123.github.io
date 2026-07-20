@@ -2,7 +2,7 @@
 // email a digest of anything new. Run by .github/workflows/job-scraper.yml.
 import { readFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
-import { fetchSimplify, fetchGreenhouse, fetchLever, fetchAshby, fetchWorkday } from './lib/sources.mjs';
+import { fetchSimplify, fetchGreenhouse, fetchLever, fetchAshby, fetchWorkday, fetchInternList } from './lib/sources.mjs';
 import { env, sendEmail, esc, isUSLocation } from './lib/util.mjs';
 
 const DASHBOARD_URL = 'https://elsali.dev/jobs.html';
@@ -19,6 +19,7 @@ const results = await Promise.allSettled([
   fetchLever(companies.lever || []),
   fetchAshby(companies.ashby || []),
   fetchWorkday(companies.workday || []),
+  fetchInternList(),
 ]);
 const allRows = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
 for (const r of results) if (r.status === 'rejected') console.warn('source failed:', r.reason);
@@ -27,17 +28,23 @@ for (const r of results) if (r.status === 'rejected') console.warn('source faile
 const rows = allRows.filter((r) => isUSLocation(r.locations));
 console.log(`US filter: ${allRows.length} → ${rows.length} rows`);
 
-// Dedupe within this run (same job can appear via Simplify AND the direct API;
-// prefer the direct-API row since its external_id is stabler). Between two
-// simplify-format repos, keep the FIRST (SimplifyJobs) row so it upserts onto
-// the external_ids already stored from earlier runs instead of duplicating.
+// Dedupe within this run (same job can appear via an aggregator AND the direct
+// API; prefer the direct-API row since its external_id is stabler). Between
+// aggregators (simplify repos, internlist), keep the FIRST row so it upserts
+// onto the external_ids already stored from earlier runs instead of duplicating.
+const isAggregator = (s) => s === 'simplify' || s === 'internlist';
 const byKey = new Map();
 for (const row of rows) {
   const key = row.url.replace(/[?#].*$/, '').replace(/\/$/, '').toLowerCase();
   const existing = byKey.get(key);
-  if (!existing || (existing.source === 'simplify' && row.source !== 'simplify')) byKey.set(key, row);
+  if (!existing || (isAggregator(existing.source) && !isAggregator(row.source))) byKey.set(key, row);
 }
-const deduped = [...byKey.values()];
+// Second pass: an aggregator row describing a job we also fetched from a
+// direct ATS API (same company+title) is a duplicate with a worse URL
+// (e.g. internlist links go through jobright.ai interstitials).
+const normKey = (r) => (r.company + '|' + r.title).toLowerCase().replace(/[^a-z0-9|]/g, '');
+const directKeys = new Set([...byKey.values()].filter((r) => !isAggregator(r.source)).map(normKey));
+const deduped = [...byKey.values()].filter((r) => !isAggregator(r.source) || !directKeys.has(normKey(r)));
 console.log(`Fetched ${rows.length} rows → ${deduped.length} after dedupe`);
 
 // Upsert, then find what's new: first_seen defaults to now() on INSERT only,
