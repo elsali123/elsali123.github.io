@@ -69,20 +69,28 @@ export async function fetchInternList() {
         const cell = {};
         for (const [cid, v] of Object.entries(r.cellValuesByColumnId || {})) cell[colName[cid]] = v;
         const title = String(cell['Position Title'] || '').trim();
-        const url = cell['Apply']?.url;
+        const jobrightUrl = cell['Apply']?.url;
         const company = String(cell['Company'] || '').trim();
-        if (!title || !url || !company) continue;
+        if (!title || !jobrightUrl || !company) continue;
         // Hire Time comes as "2026-Fall" — normalize so the term classifier sees it.
         const term = classifyPosting(title, String(cell['Hire Time'] || '').replace(/-/g, ' '));
         if (!term) continue;
+        // intern-list's "Apply" link always goes through a jobright.ai page
+        // that gates the real employer link behind a login — even its own
+        // public page data has no direct URL. A search link reliably lands
+        // on the real posting in the top results when a human clicks it
+        // (verified against Ashby/Greenhouse links + company career pages);
+        // resolving it server-side isn't viable — search engines block
+        // scripted queries. ats: 'search' flags this for tailored UI copy.
+        const url = `https://www.google.com/search?q=${encodeURIComponent(`${company} ${title} internship apply`)}`;
         rows.push({
-          source: 'internlist', ats: detectAts(url),
+          source: 'internlist', ats: 'search',
           external_id: r.id,
           company, title,
           locations: String(cell['Location'] || '').replace(/\s*\n\s*/g, '; '),
           url, term,
           posted_at: cell['Date'] ? new Date(cell['Date']).toISOString() : null,
-          raw: { view: label, id: r.id },
+          raw: { view: label, id: r.id, jobrightUrl },
         });
       }
       console.log(`internlist: ${label} → ${rows.length - before} target-term rows`);

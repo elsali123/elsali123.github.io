@@ -114,7 +114,12 @@ for (const [idx, app] of queue.entries()) {
     continue;
   }
   if (!SUPPORTED_ATS.has(job.ats)) {
-    await setStatus(app.id, 'needs_review', `Unsupported ATS (${job.ats}) — apply manually: ${job.url}`);
+    // ats: 'search' (intern-list.com rows) has no real posting link at all —
+    // say so plainly instead of implying job.url is the application page.
+    const detail = job.ats === 'search'
+      ? `No direct apply link (aggregator source) — the job link is a search for the real posting: ${job.url}`
+      : `Unsupported ATS (${job.ats}) — apply manually: ${job.url}`;
+    await setStatus(app.id, 'needs_review', detail);
     results.push({ tag, status: 'needs_review', detail: `unsupported ATS ${job.ats}`, url: job.url });
     console.log(`  → skipped: unsupported ATS (${job.ats})`);
     continue;

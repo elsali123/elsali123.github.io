@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSimplify, fetchGreenhouse, fetchLever, fetchAshby, fetchWorkday, fetchInternList } from './lib/sources.mjs';
-import { env, sendEmail, esc, isUSLocation } from './lib/util.mjs';
+import { env, sendEmail, esc, isUSLocation, classifyPosting, postingKey } from './lib/util.mjs';
 
 const DASHBOARD_URL = 'https://elsali.dev/jobs.html';
 
@@ -24,6 +24,21 @@ const results = await Promise.allSettled([
 const allRows = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
 for (const r of results) if (r.status === 'rejected') console.warn('source failed:', r.reason);
 
+// Fetch every row from a table, paginating past PostgREST's default 1000-row
+// cap — with 2000+ postings now stored, a plain .select() silently truncates.
+async function selectAll(table, columns, filter) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    let q = sb.from(table).select(columns).range(from, from + 999);
+    if (filter) q = filter(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
 // US internships only.
 const rows = allRows.filter((r) => isUSLocation(r.locations));
 console.log(`US filter: ${allRows.length} → ${rows.length} rows`);
@@ -35,7 +50,7 @@ console.log(`US filter: ${allRows.length} → ${rows.length} rows`);
 const isAggregator = (s) => s === 'simplify' || s === 'internlist';
 const byKey = new Map();
 for (const row of rows) {
-  const key = row.url.replace(/[?#].*$/, '').replace(/\/$/, '').toLowerCase();
+  const key = postingKey(row.url);
   const existing = byKey.get(key);
   if (!existing || (isAggregator(existing.source) && !isAggregator(row.source))) byKey.set(key, row);
 }
@@ -54,35 +69,79 @@ if (deduped.length) {
   const { error } = await sb.from('job_postings').upsert(deduped, { onConflict: 'source,external_id' });
   if (error) throw error;
 }
-// Purge any stored rows that fail the US filter (covers rows scraped
-// before the filter existed, and future filter tightening).
-const { data: stored, error: stErr } = await sb.from('job_postings').select('id, locations');
-if (stErr) throw stErr;
-const nonUS = (stored || []).filter((r) => !isUSLocation(r.locations)).map((r) => r.id);
-for (let i = 0; i < nonUS.length; i += 100) {
-  const { error } = await sb.from('job_postings').delete().in('id', nonUS.slice(i, i + 100));
+// Purge any stored rows that fail the US filter, or that the classifier
+// would now reject (grad-only titles, bare fall/spring) — covers rows
+// scraped before these filters existed, and future filter tightening.
+const stored = await selectAll('job_postings', 'id, title, locations');
+const nonUS = stored.filter((r) => !isUSLocation(r.locations)).map((r) => r.id);
+const excluded = stored.filter((r) => !classifyPosting(r.title)).map((r) => r.id);
+const toPurge = [...new Set([...nonUS, ...excluded])];
+for (let i = 0; i < toPurge.length; i += 100) {
+  const { error } = await sb.from('job_postings').delete().in('id', toPurge.slice(i, i + 100));
   if (error) throw error;
 }
 if (nonUS.length) console.log(`Purged ${nonUS.length} non-US postings`);
+if (excluded.length) console.log(`Purged ${excluded.length} grad-only/fall/spring postings`);
+
+// intern-list.com's feed churns fast (postings rotate out within a day) and,
+// unlike a company's own ATS board, a job missing from this run's fetch has
+// no other signal that it's gone — its stale row would keep the dead
+// jobright.ai link forever otherwise. Deactivate (not delete, so any
+// application referencing it stays intact) whatever we didn't see this run.
+const internlistSeenIds = new Set(allRows.filter((r) => r.source === 'internlist').map((r) => r.external_id));
+if (internlistSeenIds.size) {
+  const activeInternlist = await selectAll('job_postings', 'id, external_id',
+    (q) => q.eq('source', 'internlist').eq('active', true));
+  const staleIds = activeInternlist.filter((r) => !internlistSeenIds.has(r.external_id)).map((r) => r.id);
+  for (let i = 0; i < staleIds.length; i += 100) {
+    const { error } = await sb.from('job_postings').update({ active: false }).in('id', staleIds.slice(i, i + 100));
+    if (error) throw error;
+  }
+  if (staleIds.length) console.log(`Deactivated ${staleIds.length} internlist postings no longer listed`);
+} else {
+  console.log('internlist fetch returned nothing this run — skipping staleness cleanup to be safe');
+}
 
 const { data: fresh, error: freshErr } = await sb
   .from('job_postings')
-  .select('company, title, url, term, locations')
+  .select('company, title, url, term, locations, source')
   .gte('first_seen', runStart)
   .order('company');
 if (freshErr) throw freshErr;
 console.log(`Upserted ${deduped.length} postings, ${fresh.length} new`);
 
-if (fresh.length) {
-  const items = fresh
-    .map((j) => `<li><b>${esc(j.company)}</b> — <a href="${esc(j.url)}">${esc(j.title)}</a>
-       <small>(${esc(j.term)}${j.locations ? ' · ' + esc(j.locations) : ''})</small></li>`)
-    .join('\n');
+// Dedupe the digest by job identity so the same role can't appear twice; when a
+// job was seen both on intern-list and elsewhere, keep the non-intern-list row
+// so it lands in the main list.
+const freshByKey = new Map();
+for (const j of fresh) {
+  const key = postingKey(j.url);
+  const existing = freshByKey.get(key);
+  if (!existing || (existing.source === 'internlist' && j.source !== 'internlist')) freshByKey.set(key, j);
+}
+const uniqueFresh = [...freshByKey.values()];
+const mainFresh = uniqueFresh.filter((j) => j.source !== 'internlist');
+const internlistFresh = uniqueFresh.filter((j) => j.source === 'internlist');
+
+const li = (j) => `<li><b>${esc(j.company)}</b> — <a href="${esc(j.url)}">${esc(j.title)}</a>
+   <small>(${esc(j.term)}${j.locations ? ' · ' + esc(j.locations) : ''})</small></li>`;
+
+// Only intern-list postings are new → nothing worth an email (that feed is noisy
+// and unverified; it lives in the dashboard's intern-list view instead).
+if (!mainFresh.length) {
+  console.log(internlistFresh.length
+    ? `No new main-source postings; ${internlistFresh.length} intern-list-only — no digest sent.`
+    : 'No new postings; no digest sent.');
+} else {
+  const internlistSection = internlistFresh.length
+    ? `<hr style="margin:22px 0;border:none;border-top:1px solid #eee">
+       <p><b>From intern-list.com</b> <small>(unverified aggregator — links go through jobright.ai)</small></p>
+       <ul>${internlistFresh.map(li).join('\n')}</ul>`
+    : '';
   await sendEmail(
-    `🧑‍💻 ${fresh.length} new internship posting${fresh.length > 1 ? 's' : ''}`,
-    `<p>New postings found this hour:</p><ul>${items}</ul>
+    `🧑‍💻 ${mainFresh.length} new internship posting${mainFresh.length > 1 ? 's' : ''}`,
+    `<p>New postings found this hour:</p><ul>${mainFresh.map(li).join('\n')}</ul>
+     ${internlistSection}
      <p><a href="${DASHBOARD_URL}">Open the dashboard</a> to queue applications.</p>`
   );
-} else {
-  console.log('No new postings; no digest sent.');
 }

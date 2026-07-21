@@ -75,7 +75,17 @@
     background: rgba(149,117,205,.12); color: var(--purple-deep); margin-right: 5px; font-weight: 500; }
   .chip.new { background: rgba(46,125,50,.12); color: var(--green); }
   .chip.manual { background: rgba(255,152,0,.18); color: var(--amber); font-weight: 600; }
+  .chip.internlist { background: rgba(94,53,177,.14); color: var(--purple-deep); font-weight: 600; }
   .card.manual-apply { border-left: 4px solid rgba(255,152,0,.55); }
+  .card.internlist-src { border-left: 4px solid rgba(94,53,177,.4); }
+  .segmented { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px;
+    background: rgba(255,255,255,.5); border: 1px solid var(--border); margin-bottom: 16px; }
+  .seg { border: 0; background: transparent; color: var(--muted); cursor: pointer;
+    font: 500 13px/1 'DM Sans', sans-serif; padding: 7px 15px; border-radius: 999px; transition: all .16s ease; }
+  .seg:hover { color: var(--pink); }
+  .seg.active { color: #fff; background: linear-gradient(120deg, var(--pink), var(--purple-deep));
+    box-shadow: 0 3px 10px rgba(194,24,91,.22); }
+  .seg .n { opacity: .7; font-size: 12px; margin-left: 4px; }
   .jobnote { font-size: 12.5px; color: var(--amber); background: rgba(255,193,7,.1);
     border-radius: 10px; padding: 6px 10px; margin-top: 6px; }
   .jobnote a { color: var(--muted); margin-left: 6px; font-size: 11.5px; }
@@ -157,6 +167,12 @@
           <input id="manualTitle" placeholder="Job title (optional)" style="flex:1; min-width:120px">
           <button class="primary" id="manualBtn" onclick="addManualJob()">Add &amp; queue</button>
         </div>
+      </div>
+      <div class="meta" id="feedStats" style="margin-bottom:10px"></div>
+      <div class="segmented" id="sourceToggle">
+        <button class="seg active" data-src="main" onclick="setSourceFilter('main')">Main sources <span class="n" id="segMainN"></span></button>
+        <button class="seg" data-src="internlist" onclick="setSourceFilter('internlist')">intern-list <span class="n" id="segIlN"></span></button>
+        <button class="seg" data-src="all" onclick="setSourceFilter('all')">All <span class="n" id="segAllN"></span></button>
       </div>
       <div class="filters">
         <input type="search" id="fSearch" placeholder="Search company or title…" oninput="renderJobs()">
@@ -258,6 +274,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_rpF1rLZ3Hrgjn4mPRILLCg_RmUf6C6n';
 
 let sb, user = null, jobs = [], apps = [], profile = null;
 let notes = {}, editingNote = null;   // job_id → note text; job_id being edited
+let sourceFilter = 'main';            // 'main' | 'internlist' | 'all'
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -294,15 +311,19 @@ function setUser(u) {
 // ---------- data ----------
 async function loadAll() {
   const since = new Date(Date.now() - 45 * 864e5).toISOString(); // feed = last 45 days
-  const [j, a, p] = await Promise.all([
+  const [j, a, p, c] = await Promise.all([
     sb.from('job_postings').select('*').eq('active', true).gte('first_seen', since)
       .order('first_seen', { ascending: false }).limit(1000),
     sb.from('applications').select('*, job:job_postings(company,title,url,term,ats)')
       .order('created_at', { ascending: false }),
     sb.from('job_profile').select('*').eq('user_id', user.id).maybeSingle(),
+    sb.from('job_postings').select('id', { count: 'exact', head: true })
+      .eq('active', true).gte('first_seen', since),
   ]);
   if (j.error || a.error || p.error) { toast('Load failed: ' + (j.error||a.error||p.error).message); return; }
   jobs = j.data || []; apps = a.data || []; profile = p.data;
+  $('feedStats').textContent = c.error ? ''
+    : (c.count > jobs.length ? `${jobs.length} shown of ${c.count} total` : `${c.count}`) + ' postings in the last 45 days';
   // Notes are non-fatal: the table may not exist until the schema update runs.
   const n = await sb.from('job_notes').select('job_id, note, category');
   notes = {};
@@ -385,6 +406,39 @@ function oneAppCompanies() {
 }
 function rerender() { renderJobs(); renderApps(); }
 
+// Canonical identity of a posting — mirrors postingKey() in the scraper so we
+// collapse the same job seen through several sources. Greenhouse jobs key on
+// their numeric id; everything else on host + path (tracking params dropped).
+function postingKey(url) {
+  url = String(url || '');
+  const gh = url.match(/[?&]gh_jid=(\d+)/i) || (/greenhouse\.io/i.test(url) && url.match(/\/jobs\/(\d+)/i));
+  if (gh) return 'gh:' + gh[1];
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '').toLowerCase();
+    const path = u.pathname.replace(/\/+$/, '').toLowerCase();
+    return 'u:' + host + (path || u.search.toLowerCase() || '/');
+  } catch { return 'raw:' + url.toLowerCase(); }
+}
+
+// Collapse identity-duplicate postings, preferring the non-intern-list row so a
+// job found on both stays on the main list.
+function dedupedJobs() {
+  const byKey = new Map();
+  for (const j of jobs) {
+    const k = postingKey(j.url);
+    const ex = byKey.get(k);
+    if (!ex || (ex.source === 'internlist' && j.source !== 'internlist')) byKey.set(k, j);
+  }
+  return [...byKey.values()];
+}
+
+function setSourceFilter(src) {
+  sourceFilter = src;
+  document.querySelectorAll('#sourceToggle .seg').forEach(b => b.classList.toggle('active', b.dataset.src === src));
+  renderJobs();
+}
+
 // ---------- jobs tab ----------
 function renderJobs() {
   const q = $('fSearch').value.toLowerCase();
@@ -398,7 +452,16 @@ function renderJobs() {
   const showDismissed = $('fShowDismissed').checked;
   const oneAppCos = oneAppCompanies();
 
-  const list = jobs.filter(j =>
+  const unique = dedupedJobs();
+  // Segment counts reflect the source split of the whole deduped feed.
+  const ilCount = unique.filter(j => j.source === 'internlist').length;
+  $('segMainN').textContent = unique.length - ilCount;
+  $('segIlN').textContent = ilCount;
+  $('segAllN').textContent = unique.length;
+
+  const list = unique.filter(j =>
+    (sourceFilter === 'all' ||
+      (sourceFilter === 'internlist' ? j.source === 'internlist' : j.source !== 'internlist')) &&
     (!q || (j.company + ' ' + j.title).toLowerCase().includes(q)) &&
     (!term || j.term === term) &&
     (!cutoff || new Date(j.first_seen).getTime() > cutoff) &&
@@ -410,13 +473,15 @@ function renderJobs() {
     const isNew = new Date(j.first_seen).getTime() > dayAgo;
     const queued = appliedJobIds.has(j.id);
     const dismissed = notes[j.id]?.category === 'not_interested';
+    const fromIl = j.source === 'internlist';
     const coWarn = oneAppCos.has(normCo(j.company)) && notes[j.id]?.category !== 'one_app_only'
       ? '<span class="chip manual">☝️ one app only at this company</span>' : '';
-    return `<div class="card job"${dismissed ? ' style="opacity:.55"' : ''}>
+    return `<div class="card job${fromIl ? ' internlist-src' : ''}"${dismissed ? ' style="opacity:.55"' : ''}>
       <div class="info">
         <h3><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.company)} — ${esc(j.title)}</a></h3>
         <div class="meta">
           ${isNew ? '<span class="chip new">new</span>' : ''}
+          ${fromIl ? '<span class="chip internlist">intern-list</span>' : ''}
           <span class="chip">${esc(j.term)}</span>
           <span class="chip">${esc(j.ats)}</span>${coWarn}
           ${j.locations ? `<span class="chip">${esc(j.locations.slice(0, 60))}</span>` : ''}
@@ -539,11 +604,13 @@ function renderApps() {
   $('appList').innerHTML = apps.length ? apps.map(a => {
     // The bot can only fill these ATSs — anything else (Workday etc.) is on you.
     const manual = a.job && !AUTO_ATS.includes(a.job.ats);
+    const isSearch = a.job?.ats === 'search'; // internlist: no direct posting link exists
     const manualChip = manual
-      ? ` <span class="chip manual">✋ manual apply · ${esc(a.job.ats || '?')}</span>` : '';
+      ? ` <span class="chip manual">${isSearch ? '🔍 search to apply' : `✋ manual apply · ${esc(a.job.ats || '?')}`}</span>` : '';
     const manualHint = manual && a.status !== 'submitted'
-      ? `<div class="detail">🤖 The bot can't fill ${esc(a.job.ats || 'this')} forms — open the job link,
-           apply yourself, then hit "✓ Mark submitted".</div>` : '';
+      ? `<div class="detail">${isSearch
+          ? '🔍 This came from an aggregator with no working apply link — the job link is a search for the real posting (usually the top result), open it, apply yourself, then hit "✓ Mark submitted".'
+          : `🤖 The bot can't fill ${esc(a.job.ats || 'this')} forms — open the job link, apply yourself, then hit "✓ Mark submitted".`}</div>` : '';
     const answers = a.answers && Object.keys(a.answers).length
       ? `<details class="answers"><summary class="meta">answers used (${Object.keys(a.answers).length})</summary><dl>` +
         Object.entries(a.answers).map(([q, v]) => `<dt>${esc(q)}</dt><dd>${esc(v)}</dd>`).join('') +
