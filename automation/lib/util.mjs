@@ -1,15 +1,23 @@
 // Shared helpers: term detection, ATS detection, env, email.
+import { readFile } from 'node:fs/promises';
 import nodemailer from 'nodemailer';
 
 export const TARGET_TERMS = ['Winter 2026', 'Summer 2027'];
 
 const INTERN_RE = /\b(intern|internship|co[- ]?op)\b/i;
 
+// Grad-only signal in the title, e.g. "Research Intern (PhD)" or
+// "ML Intern — Master's Student". Bare "MS"/"BS" abbreviations are NOT
+// grad-only — most internships list them as accepted degrees, so only the
+// spelled-out forms count as a real PhD/Master's-targeted posting.
+const GRAD_ONLY_RE = /\bph\.?d\.?\b|\bdoctoral\b|\bdoctorate\b|\bmaster'?s\b/i;
+
 // Decide whether a posting looks like an internship for one of the target
 // terms. Returns the matched term, 'Unspecified' for intern roles with no
 // term in the text, or null to skip the posting entirely.
 export function classifyPosting(title, extraText = '') {
   if (!INTERN_RE.test(title)) return null;
+  if (GRAD_ONLY_RE.test(title)) return null;
   const hay = `${title} ${extraText}`.toLowerCase();
   for (const term of TARGET_TERMS) {
     const [season, year] = term.toLowerCase().split(' ');
@@ -18,6 +26,9 @@ export function classifyPosting(title, extraText = '') {
   }
   // Explicitly some *other* term (e.g. "Fall 2026") → skip.
   if (/\b(spring|summer|fall|autumn|winter)[,\s]*20\d\d\b/.test(hay)) return null;
+  // Fall/spring internships with no year in the text are still fall/spring
+  // (winter is fine even with no year — it's a target season).
+  if (/\b(fall|autumn|spring)\b/i.test(hay)) return null;
   return 'Unspecified';
 }
 
@@ -83,6 +94,64 @@ export async function loadPriorAnswers(sb, job, excludeId) {
     }
   }
   return out;
+}
+
+// Hand-drafted essay answers from application-answers.md at the repo root
+// (gitignored — personal content, local-only; absent in CI, which is fine
+// since unattended runs never submit anyway). Convention for that file,
+// followed here: each `## <question>` section runs until the next `---`
+// separator; a paragraph that's ENTIRELY an italic `*(...)*` note is a
+// meta-comment (word count, sourcing) and is stripped; a paragraph
+// mentioning "not yet drafted" is an unfinished placeholder and is
+// stripped; a section containing "⚠" anywhere carries a caution (e.g.
+// "verify before using") and is skipped whole, falling through to the LLM
+// rather than auto-filling something unverified.
+export async function loadDraftedAnswers() {
+  let text;
+  try {
+    text = await readFile(new URL('../../application-answers.md', import.meta.url), 'utf8');
+  } catch {
+    return {}; // not created yet — nothing drafted, not an error
+  }
+  const out = {};
+  for (const section of text.split(/\n##\s+/).slice(1)) {
+    const nl = section.indexOf('\n');
+    const question = (nl === -1 ? section : section.slice(0, nl)).trim();
+    const body = (nl === -1 ? '' : section.slice(nl + 1)).split(/\n---\s*\n/)[0];
+    const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    if (!question || paragraphs.some((p) => p.includes('⚠'))) continue;
+    const usable = paragraphs.filter((p) => !/^\*\(.*\)\*$/s.test(p) && !/not yet drafted/i.test(p));
+    if (usable.length) out[question] = usable.join('\n\n');
+  }
+  return out;
+}
+
+// Query params that carry no job identity — safe to drop so tracking variants of
+// the same URL unify. Everything else in the query is kept, because some ATSs
+// and aggregators put the whole identity there (e.g. google.com/search?q=… apply
+// links from intern-list, where dropping the query would merge every posting).
+const TRACKING_PARAM = /^(utm_|gh_jid$|mobile$|needsredirect$|mode$|src$|source$|ref$|campaign$|trk$|trackid$|lever-source)/i;
+
+// Canonical identity for a posting, used to collapse the same job seen through
+// different sources. Greenhouse jobs are keyed by their globally-unique numeric
+// id (from a `?gh_jid=` embed param or a `greenhouse.io/.../jobs/<id>` path), so
+// a direct-API row and an aggregator row pointing at the same job unify.
+// Everything else is keyed by host + path + meaningful query params (tracking
+// junk stripped, remaining params sorted for stability).
+export function postingKey(url) {
+  url = String(url || '');
+  const gh = url.match(/[?&]gh_jid=(\d+)/i) || (/greenhouse\.io/i.test(url) && url.match(/\/jobs\/(\d+)/i));
+  if (gh) return 'gh:' + gh[1];
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '').toLowerCase();
+    const path = u.pathname.replace(/\/+$/, '').toLowerCase();
+    const params = [...u.searchParams.entries()]
+      .filter(([k]) => !TRACKING_PARAM.test(k))
+      .map(([k, v]) => k.toLowerCase() + '=' + v.toLowerCase())
+      .sort();
+    return 'u:' + host + (path || '/') + (params.length ? '?' + params.join('&') : '');
+  } catch { return 'raw:' + url.toLowerCase(); }
 }
 
 export function detectAts(url) {

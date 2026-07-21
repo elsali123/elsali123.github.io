@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { fillAndSubmit } from './lib/fill.mjs';
-import { env, sendEmail, esc, detectAts, loadPriorAnswers } from './lib/util.mjs';
+import { env, sendEmail, esc, detectAts, loadPriorAnswers, loadDraftedAnswers } from './lib/util.mjs';
 
 const MAX_PER_RUN = Number(process.env.MAX_APPLICATIONS_PER_RUN || 8);
 const SUPPORTED_ATS = new Set(['greenhouse', 'lever', 'ashby']);
@@ -88,6 +88,8 @@ async function getProfile(userId) {
       await sb.from('job_profile').update({ resume_text: p.resume_text }).eq('user_id', userId);
     } catch (e) { console.warn('resume text extraction failed:', e.message); }
   }
+
+  p.draftedAnswers = await loadDraftedAnswers().catch((e) => { console.warn('drafted answers unavailable:', e.message); return {}; });
 
   const entry = { profile: p, files };
   profiles.set(userId, entry);

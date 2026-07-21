@@ -2,7 +2,9 @@
 //
 // Strategy: navigate to the apply form, enumerate visible fields, answer each
 // from (1) standard profile fields, (2) the user's saved common_answers,
-// (3) Claude — then submit and verify a confirmation appears.
+// (3) answers already given to this company, (4) hand-drafted essay answers
+// in application-answers.md, (5) Claude — then submit and verify a
+// confirmation appears.
 //
 // Returns { status: 'submitted'|'needs_review'|'failed', detail, answers }.
 import { llmAnswer } from './llm.mjs';
@@ -67,6 +69,15 @@ async function resolveAnswer(label, options, profile, job, answers) {
     console.log(`    ♻ reused — ${label.slice(0, 60)}`);
     answers[label] = `${prior} (reused)`;
     return matchOption(prior, options) ?? prior;
+  }
+  // Hand-drafted essay answer from application-answers.md? Free-text
+  // questions only — a curated paragraph has no business being forced into
+  // a multiple-choice/select field.
+  const drafted = !options?.length && savedAnswer(label, profile.draftedAnswers);
+  if (drafted) {
+    console.log(`    📝 drafted answer — ${label.slice(0, 60)}`);
+    answers[label] = `${drafted} (drafted)`;
+    return drafted;
   }
   const t = Date.now();
   const llm = await llmAnswer(label, options, profile, job);
