@@ -121,7 +121,12 @@ for (const j of fresh) {
 }
 const uniqueFresh = [...freshByKey.values()];
 const mainFresh = uniqueFresh.filter((j) => j.source !== 'internlist');
-const internlistFresh = uniqueFresh.filter((j) => j.source === 'internlist');
+// intern-list links go through opaque jobright.ai URLs, so they can't be
+// identity-matched to a direct ATS row — fall back to company+title to drop any
+// intern-list posting that's already in the main list ("found on both → main").
+const ctKey = (j) => (j.company + '|' + j.title).toLowerCase().replace(/[^a-z0-9|]/g, '');
+const mainCT = new Set(mainFresh.map(ctKey));
+const internlistFresh = uniqueFresh.filter((j) => j.source === 'internlist' && !mainCT.has(ctKey(j)));
 
 const li = (j) => `<li><b>${esc(j.company)}</b> — <a href="${esc(j.url)}">${esc(j.title)}</a>
    <small>(${esc(j.term)}${j.locations ? ' · ' + esc(j.locations) : ''})</small></li>`;

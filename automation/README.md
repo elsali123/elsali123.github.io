@@ -11,6 +11,7 @@ digest, and auto-applies to the ones you queue from
 | `scrape.mjs` | GitHub Actions, hourly (`:07`) | Pulls SimplifyJobs listings + Greenhouse/Lever/Ashby public APIs (all free, no keys), dedupes into Supabase `job_postings`, emails a digest of new postings |
 | `apply.mjs` | GitHub Actions, every 20 min (only when queue non-empty) | Takes `applications` rows with status `queued`, opens the job form in headless Chromium, uploads resume/transcript, fills every field from your profile / saved answers / Claude, **auto-submits** on Greenhouse, Lever & Ashby, then emails results |
 | `jobs.html` | GitHub Pages | Dashboard: browse the feed, queue applications, track status, edit profile & docs |
+| `check-posting.mjs` | run locally | `node check-posting.mjs <job-url>` — prints when a posting was first published and last updated, straight from the ATS's public API (job pages rarely show dates). Handles Greenhouse/Lever/Ashby/Workday links, plus company-hosted Greenhouse pages (`janestreet.com/…/apply/8599644002/`, `?gh_jid=` embeds). Only Greenhouse exposes "last updated" |
 
 Statuses: `queued → applying → submitted` ✅, or `needs_review` 👀 (CAPTCHA,
 Workday/unsupported site, or no confirmation detected — finish manually via the

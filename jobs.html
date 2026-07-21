@@ -311,19 +311,28 @@ function setUser(u) {
 // ---------- data ----------
 async function loadAll() {
   const since = new Date(Date.now() - 45 * 864e5).toISOString(); // feed = last 45 days
-  const [j, a, p, c] = await Promise.all([
-    sb.from('job_postings').select('*').eq('active', true).gte('first_seen', since)
-      .order('first_seen', { ascending: false }).limit(1000),
+  // Load main-source and intern-list postings separately, each capped at 1000,
+  // so intern-list's high volume (often ~1000 rows/run) can't push the real
+  // main-source postings out of the load window and starve the default view.
+  const feed = (q) => q.from('job_postings').select('*').eq('active', true).gte('first_seen', since)
+    .order('first_seen', { ascending: false }).limit(1000);
+  const count = (q) => q.from('job_postings').select('id', { count: 'exact', head: true })
+    .eq('active', true).gte('first_seen', since);
+  const [jMain, jIl, a, p, cMain, cIl] = await Promise.all([
+    feed(sb).neq('source', 'internlist'),
+    feed(sb).eq('source', 'internlist'),
     sb.from('applications').select('*, job:job_postings(company,title,url,term,ats)')
       .order('created_at', { ascending: false }),
     sb.from('job_profile').select('*').eq('user_id', user.id).maybeSingle(),
-    sb.from('job_postings').select('id', { count: 'exact', head: true })
-      .eq('active', true).gte('first_seen', since),
+    count(sb).neq('source', 'internlist'),
+    count(sb).eq('source', 'internlist'),
   ]);
+  const j = jMain.error ? jMain : jIl;
   if (j.error || a.error || p.error) { toast('Load failed: ' + (j.error||a.error||p.error).message); return; }
-  jobs = j.data || []; apps = a.data || []; profile = p.data;
-  $('feedStats').textContent = c.error ? ''
-    : (c.count > jobs.length ? `${jobs.length} shown of ${c.count} total` : `${c.count}`) + ' postings in the last 45 days';
+  jobs = [...(jMain.data || []), ...(jIl.data || [])]; apps = a.data || []; profile = p.data;
+  const shown = (n, total) => total > n ? `${n} of ${total}` : `${total}`;
+  $('feedStats').textContent = (cMain.error || cIl.error) ? ''
+    : `${shown((jMain.data||[]).length, cMain.count)} main-source · ${shown((jIl.data||[]).length, cIl.count)} intern-list postings in the last 45 days`;
   // Notes are non-fatal: the table may not exist until the schema update runs.
   const n = await sb.from('job_notes').select('job_id, note, category');
   notes = {};
@@ -408,7 +417,10 @@ function rerender() { renderJobs(); renderApps(); }
 
 // Canonical identity of a posting — mirrors postingKey() in the scraper so we
 // collapse the same job seen through several sources. Greenhouse jobs key on
-// their numeric id; everything else on host + path (tracking params dropped).
+// their numeric id; everything else on host + path + meaningful query params
+// (tracking junk stripped, but the query is kept when it carries the identity,
+// e.g. google.com/search?q=… apply links from intern-list).
+const TRACKING_PARAM = /^(utm_|gh_jid$|mobile$|needsredirect$|mode$|src$|source$|ref$|campaign$|trk$|trackid$|lever-source)/i;
 function postingKey(url) {
   url = String(url || '');
   const gh = url.match(/[?&]gh_jid=(\d+)/i) || (/greenhouse\.io/i.test(url) && url.match(/\/jobs\/(\d+)/i));
@@ -417,12 +429,19 @@ function postingKey(url) {
     const u = new URL(url);
     const host = u.hostname.replace(/^www\./, '').toLowerCase();
     const path = u.pathname.replace(/\/+$/, '').toLowerCase();
-    return 'u:' + host + (path || u.search.toLowerCase() || '/');
+    const params = [...u.searchParams.entries()]
+      .filter(([k]) => !TRACKING_PARAM.test(k))
+      .map(([k, v]) => k.toLowerCase() + '=' + v.toLowerCase())
+      .sort();
+    return 'u:' + host + (path || '/') + (params.length ? '?' + params.join('&') : '');
   } catch { return 'raw:' + url.toLowerCase(); }
 }
 
 // Collapse identity-duplicate postings, preferring the non-intern-list row so a
-// job found on both stays on the main list.
+// job found on both stays on the main list. intern-list links go through opaque
+// jobright.ai URLs that can't be identity-matched to a direct ATS row, so we
+// also drop any intern-list posting whose company+title is already on the main
+// list ("found on both → keep on normal list").
 function dedupedJobs() {
   const byKey = new Map();
   for (const j of jobs) {
@@ -430,7 +449,10 @@ function dedupedJobs() {
     const ex = byKey.get(k);
     if (!ex || (ex.source === 'internlist' && j.source !== 'internlist')) byKey.set(k, j);
   }
-  return [...byKey.values()];
+  const uniq = [...byKey.values()];
+  const ctKey = (j) => (j.company + '|' + j.title).toLowerCase().replace(/[^a-z0-9|]/g, '');
+  const mainCT = new Set(uniq.filter(j => j.source !== 'internlist').map(ctKey));
+  return uniq.filter(j => j.source !== 'internlist' || !mainCT.has(ctKey(j)));
 }
 
 function setSourceFilter(src) {
