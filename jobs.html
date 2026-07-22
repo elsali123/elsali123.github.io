@@ -197,6 +197,7 @@
     <section id="tab-apps" style="display:none">
       <div class="note">📦 staged (in your cart) &nbsp;·&nbsp; 🚀 ready (released — fill via assisted session)
         &nbsp;·&nbsp; ✅ submitted &nbsp;·&nbsp; 👀 needs review &nbsp;·&nbsp; ❌ failed &nbsp;·&nbsp; 🗑 abandoned (gave up on it)</div>
+      <div class="segmented" id="appFilterBar" style="display:none; flex-wrap:wrap"></div>
       <div id="releaseBar" style="margin-bottom:12px"></div>
       <div id="appList"></div>
     </section>
@@ -275,6 +276,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_rpF1rLZ3Hrgjn4mPRILLCg_RmUf6C6n';
 let sb, user = null, jobs = [], apps = [], profile = null;
 let notes = {}, editingNote = null;   // job_id → note text; job_id being edited
 let sourceFilter = 'main';            // 'main' | 'internlist' | 'all'
+let appFilter = 'all';                // applications tab: 'all' | a status name
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -614,16 +616,38 @@ async function sbFindByUrl(norm) {
 }
 
 // ---------- applications tab ----------
+function setAppFilter(status) { appFilter = status; renderApps(); }
+
 function renderApps() {
-  $('appCount').textContent = apps.length;
-  const staged = apps.filter(a => a.status === 'staged').length;
-  const ready = apps.filter(a => a.status === 'ready').length;
+  // Count applications per status; the tab badge shows submitted only.
+  const counts = {};
+  for (const a of apps) counts[a.status] = (counts[a.status] || 0) + 1;
+  $('appCount').textContent = counts.submitted || 0;
+  // If the active filter's category emptied out, fall back to All.
+  if (appFilter !== 'all' && !counts[appFilter]) appFilter = 'all';
+
+  // Filter/count bar — one pill per status present, showing its total; click to filter.
+  const STATUS_ORDER = ['staged', 'ready', 'applying', 'submitted', 'needs_review', 'failed', 'abandoned', 'queued'];
+  const bar = $('appFilterBar');
+  if (apps.length) {
+    bar.style.display = '';
+    const seg = (val, label, n) =>
+      `<button class="seg${appFilter === val ? ' active' : ''}" onclick="setAppFilter('${val}')">${label} <span class="n">${n}</span></button>`;
+    bar.innerHTML = seg('all', 'All', apps.length) +
+      STATUS_ORDER.filter(s => counts[s]).map(s => seg(s, s.replace('_', ' '), counts[s])).join('');
+  } else {
+    bar.style.display = 'none';
+  }
+
+  const staged = counts.staged || 0;
+  const ready = counts.ready || 0;
   $('releaseBar').innerHTML =
     (staged ? `<button class="primary" id="releaseBtn" onclick="releaseSelected()">🚀 Apply selected (${staged}/${staged})</button>
        <button class="ghost" onclick="toggleSelectAll()">select all / none</button> ` : '') +
     (ready ? `<span class="meta">— ${ready} released: double-click <b>automation/assist.command</b> on your Mac (or <code>npm run assist</code>) to fill them; you submit each by hand</span>` : '');
   const AUTO_ATS = ['greenhouse', 'lever', 'ashby'];
-  $('appList').innerHTML = apps.length ? apps.map(a => {
+  const shown = appFilter === 'all' ? apps : apps.filter(a => a.status === appFilter);
+  $('appList').innerHTML = shown.length ? shown.map(a => {
     // The bot can only fill these ATSs — anything else (Workday etc.) is on you.
     const manual = a.job && !AUTO_ATS.includes(a.job.ats);
     const isSearch = a.job?.ats === 'search'; // internlist: no direct posting link exists
@@ -665,7 +689,9 @@ function renderApps() {
       <span class="status ${esc(a.status)}">${esc(a.status.replace('_', ' '))}</span>
       ${retry}${markDone}${abandon}${remove}
     </div>`;
-  }).join('') : '<div class="empty">Nothing queued yet — hit Apply on a job.</div>';
+  }).join('') : `<div class="empty">${apps.length
+    ? `No ${appFilter.replace('_', ' ')} applications.`
+    : 'Nothing queued yet — hit Apply on a job.'}</div>`;
 }
 async function retryApp(id) {
   const { error } = await sb.from('applications')
