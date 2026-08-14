@@ -66,7 +66,8 @@ console.log(`Fetched ${rows.length} rows → ${deduped.length} after dedupe`);
 // so rows first seen after this run started are the fresh ones.
 const runStart = new Date(Date.now() - 60_000).toISOString(); // 1 min skew allowance
 if (deduped.length) {
-  const { error } = await sb.from('job_postings').upsert(deduped, { onConflict: 'source,external_id' });
+  const toUpsert = deduped.map(r => ({ ...r, active: true }));
+  const { error } = await sb.from('job_postings').upsert(toUpsert, { onConflict: 'source,external_id' });
   if (error) throw error;
 }
 // Purge any stored rows that fail the US filter, or that the classifier
@@ -100,6 +101,16 @@ if (internlistSeenIds.size) {
   if (staleIds.length) console.log(`Deactivated ${staleIds.length} internlist postings no longer listed`);
 } else {
   console.log('internlist fetch returned nothing this run — skipping staleness cleanup to be safe');
+}
+
+// Activate all valid postings (pass the US + intern filters, not deactivated as stale)
+const validPostings = stored.filter((r) => !toPurge.includes(r.id)).map((r) => r.id);
+if (validPostings.length) {
+  for (let i = 0; i < validPostings.length; i += 100) {
+    const { error } = await sb.from('job_postings').update({ active: true }).in('id', validPostings.slice(i, i + 100));
+    if (error) throw error;
+  }
+  console.log(`Activated ${validPostings.length} valid postings`);
 }
 
 const { data: fresh, error: freshErr } = await sb
