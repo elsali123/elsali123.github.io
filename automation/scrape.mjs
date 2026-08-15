@@ -103,16 +103,6 @@ if (internlistSeenIds.size) {
   console.log('internlist fetch returned nothing this run — skipping staleness cleanup to be safe');
 }
 
-// Activate all valid postings (pass the US + intern filters, not deactivated as stale)
-const validPostings = stored.filter((r) => !toPurge.includes(r.id)).map((r) => r.id);
-if (validPostings.length) {
-  for (let i = 0; i < validPostings.length; i += 100) {
-    const { error } = await sb.from('job_postings').update({ active: true }).in('id', validPostings.slice(i, i + 100));
-    if (error) throw error;
-  }
-  console.log(`Activated ${validPostings.length} valid postings`);
-}
-
 const { data: fresh, error: freshErr } = await sb
   .from('job_postings')
   .select('company, title, url, term, locations, source')
