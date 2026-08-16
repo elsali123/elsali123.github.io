@@ -70,12 +70,19 @@ if (deduped.length) {
   const { error } = await sb.from('job_postings').upsert(toUpsert, { onConflict: 'source,external_id' });
   if (error) throw error;
 }
+// applications.job_id references job_postings(id) on delete cascade — never
+// delete a row a real application still points to, or the application (and
+// its submission history) silently disappears with it.
+const { data: refRows, error: refErr } = await sb.from('applications').select('job_id');
+if (refErr) throw refErr;
+const referencedIds = new Set((refRows || []).map((r) => r.job_id));
+
 // Purge any stored rows that fail the US filter, or that the classifier
 // would now reject (grad-only titles, bare fall/spring) — covers rows
 // scraped before these filters existed, and future filter tightening.
 const stored = await selectAll('job_postings', 'id, title, locations');
-const nonUS = stored.filter((r) => !isUSLocation(r.locations)).map((r) => r.id);
-const excluded = stored.filter((r) => !classifyPosting(r.title)).map((r) => r.id);
+const nonUS = stored.filter((r) => !isUSLocation(r.locations) && !referencedIds.has(r.id)).map((r) => r.id);
+const excluded = stored.filter((r) => !classifyPosting(r.title) && !referencedIds.has(r.id)).map((r) => r.id);
 const toPurge = [...new Set([...nonUS, ...excluded])];
 for (let i = 0; i < toPurge.length; i += 100) {
   const { error } = await sb.from('job_postings').delete().in('id', toPurge.slice(i, i + 100));
@@ -102,6 +109,31 @@ if (internlistSeenIds.size) {
 } else {
   console.log('internlist fetch returned nothing this run — skipping staleness cleanup to be safe');
 }
+
+// Roll off old, inactive intern-list rows so the table can't grow unbounded
+// again — intern-list mints a fresh Airtable record id for many
+// reposted/duplicate listings, so raw accumulation over months of hourly
+// runs previously ballooned this table into the hundreds of thousands of
+// rows and degraded query performance project-wide. Capped per run so a
+// large backlog can't make a single scrape run long or time out.
+const STALE_CUTOFF_DAYS = 14;
+const MAX_DELETE_PER_RUN = 5000;
+const DELETE_BATCH = 200; // larger batches can exceed the REST API's URL length limit
+const staleCutoff = new Date(Date.now() - STALE_CUTOFF_DAYS * 864e5).toISOString();
+let totalRolledOff = 0;
+while (totalRolledOff < MAX_DELETE_PER_RUN) {
+  let q = sb.from('job_postings').select('id')
+    .eq('source', 'internlist').eq('active', false).lt('first_seen', staleCutoff)
+    .limit(DELETE_BATCH);
+  if (referencedIds.size) q = q.not('id', 'in', `(${[...referencedIds].join(',')})`);
+  const { data: toDelete, error: selErr } = await q;
+  if (selErr) { console.warn('rolling internlist cleanup select failed:', selErr.message); break; }
+  if (!toDelete?.length) break;
+  const { error: delErr } = await sb.from('job_postings').delete().in('id', toDelete.map((r) => r.id));
+  if (delErr) { console.warn('rolling internlist cleanup delete failed:', delErr.message); break; }
+  totalRolledOff += toDelete.length;
+}
+if (totalRolledOff) console.log(`Rolling cleanup: purged ${totalRolledOff} internlist postings inactive for ${STALE_CUTOFF_DAYS}+ days`);
 
 const { data: fresh, error: freshErr } = await sb
   .from('job_postings')

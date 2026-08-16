@@ -7,7 +7,7 @@
 <title>Auto-Apply · elsali.dev</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0"></script>
 <style>
   :root {
     --pink: #c2185b; --pink-soft: #f48fb1; --purple: #9575cd; --purple-deep: #5e35b1;
@@ -318,9 +318,16 @@ async function loadAll() {
   // main-source postings out of the load window and starve the default view.
   const feed = (q) => q.from('job_postings').select('*').eq('active', true).gte('first_seen', since)
     .order('first_seen', { ascending: false }).limit(1000);
-  const count = (q) => q.from('job_postings').select('id', { count: 'exact', head: true })
+  // 'estimated' uses Postgres's planner row-count estimate instead of a full
+  // exact count — approximate, but immune to the timeouts a growing table
+  // causes on count(exact).
+  const count = (q) => q.from('job_postings').select('id', { count: 'estimated', head: true })
     .eq('active', true).gte('first_seen', since);
-  const [jMain, jIl, a, p, cMain, cIl] = await Promise.all([
+
+  // allSettled + per-section fallback: one failing query (e.g. a slow count
+  // on a bloated table) used to blank the entire dashboard via Promise.all.
+  // Each piece now degrades independently instead.
+  const settled = await Promise.allSettled([
     feed(sb).neq('source', 'internlist'),
     feed(sb).eq('source', 'internlist'),
     sb.from('applications').select('*, job:job_postings(company,title,url,term,ats)')
@@ -329,9 +336,24 @@ async function loadAll() {
     count(sb).neq('source', 'internlist'),
     count(sb).eq('source', 'internlist'),
   ]);
-  const j = jMain.error ? jMain : jIl;
-  if (j.error || a.error || p.error) { toast('Load failed: ' + (j.error||a.error||p.error).message); return; }
-  jobs = [...(jMain.data || []), ...(jIl.data || [])]; apps = a.data || []; profile = p.data;
+  const [jMain, jIl, a, p, cMain, cIl] = settled.map(
+    (r) => r.status === 'fulfilled' ? r.value : { error: r.reason }
+  );
+
+  const failures = [];
+  if (jMain.error) failures.push('main-source jobs: ' + jMain.error.message);
+  if (jIl.error) failures.push('intern-list jobs: ' + jIl.error.message);
+  if (a.error) failures.push('applications: ' + a.error.message);
+  if (p.error) failures.push('profile: ' + p.error.message);
+  if (failures.length) {
+    console.warn('loadAll partial failure:', failures);
+    toast('Partial load failure — ' + failures[0] + (failures.length > 1 ? ` (+${failures.length - 1} more)` : ''));
+  }
+
+  jobs = [...(jMain.data || []), ...(jIl.data || [])];
+  apps = a.data || [];
+  profile = p.data || profile; // keep last-known profile rather than wiping it on a transient error
+
   const shown = (n, total) => total > n ? `${n} of ${total}` : `${total}`;
   $('feedStats').textContent = (cMain.error || cIl.error) ? ''
     : `${shown((jMain.data||[]).length, cMain.count)} main-source · ${shown((jIl.data||[]).length, cIl.count)} intern-list postings in the last 45 days`;
