@@ -43,23 +43,40 @@ async function selectAll(table, columns, filter) {
 const rows = allRows.filter((r) => isUSLocation(r.locations));
 console.log(`US filter: ${allRows.length} → ${rows.length} rows`);
 
-// Dedupe within this run (same job can appear via an aggregator AND the direct
-// API; prefer the direct-API row since its external_id is stabler). Between
-// aggregators (simplify repos, internlist), keep the FIRST row so it upserts
-// onto the external_ids already stored from earlier runs instead of duplicating.
-const isAggregator = (s) => s === 'simplify' || s === 'internlist';
+// How good a row's apply link is, lower = better. A direct ATS row links
+// straight at the application form; simplify links at the employer's real
+// posting; intern-list can only produce a Google search URL (ats:'search'),
+// since its own "Apply" link is a jobright.ai interstitial behind a login.
+// Same job from two sources → keep the one you can actually apply through.
+const SOURCE_RANK = { greenhouse: 0, lever: 0, ashby: 0, workday: 0, manual: 0, simplify: 1, internlist: 2 };
+const rank = (s) => SOURCE_RANK[s] ?? 1;
+
+// Dedupe within this run. Same posting reached by two URLs collapses to the
+// better-ranked source; its external_id is also stabler across runs.
 const byKey = new Map();
 for (const row of rows) {
   const key = postingKey(row.url);
   const existing = byKey.get(key);
-  if (!existing || (isAggregator(existing.source) && !isAggregator(row.source))) byKey.set(key, row);
+  if (!existing || rank(row.source) < rank(existing.source)) byKey.set(key, row);
 }
-// Second pass: an aggregator row describing a job we also fetched from a
-// direct ATS API (same company+title) is a duplicate with a worse URL
-// (e.g. internlist links go through jobright.ai interstitials).
+
+// Second pass: drop rows describing a job another source covers better.
+// Grouping by company+title (not URL) is what catches intern-list's search
+// URLs, which share no structure with the real posting's URL.
+//
+// Only strictly-worse tiers are dropped — every row in the best tier is
+// kept. Employers legitimately post one role across many locations under
+// identical company+title (RTX lists the same intern role in 13 cities,
+// each its own Workday requisition), and those are separate applications,
+// not duplicates.
 const normKey = (r) => (r.company + '|' + r.title).toLowerCase().replace(/[^a-z0-9|]/g, '');
-const directKeys = new Set([...byKey.values()].filter((r) => !isAggregator(r.source)).map(normKey));
-const deduped = [...byKey.values()].filter((r) => !isAggregator(r.source) || !directKeys.has(normKey(r)));
+const bestRank = new Map();
+for (const r of byKey.values()) {
+  const k = normKey(r);
+  const cur = bestRank.get(k);
+  if (cur === undefined || rank(r.source) < cur) bestRank.set(k, rank(r.source));
+}
+const deduped = [...byKey.values()].filter((r) => rank(r.source) === bestRank.get(normKey(r)));
 console.log(`Fetched ${rows.length} rows → ${deduped.length} after dedupe`);
 
 // Upsert, then find what's new: first_seen defaults to now() on INSERT only,
@@ -80,7 +97,7 @@ const referencedIds = new Set((refRows || []).map((r) => r.job_id));
 // Purge any stored rows that fail the US filter, or that the classifier
 // would now reject (grad-only titles, bare fall/spring) — covers rows
 // scraped before these filters existed, and future filter tightening.
-const stored = await selectAll('job_postings', 'id, title, locations');
+const stored = await selectAll('job_postings', 'id, source, company, title, locations, first_seen, active');
 const nonUS = stored.filter((r) => !isUSLocation(r.locations) && !referencedIds.has(r.id)).map((r) => r.id);
 const excluded = stored.filter((r) => !classifyPosting(r.title) && !referencedIds.has(r.id)).map((r) => r.id);
 const toPurge = [...new Set([...nonUS, ...excluded])];
@@ -108,6 +125,43 @@ if (internlistSeenIds.size) {
   if (staleIds.length) console.log(`Deactivated ${staleIds.length} internlist postings no longer listed`);
 } else {
   console.log('internlist fetch returned nothing this run — skipping staleness cleanup to be safe');
+}
+
+// Cross-run intern-list duplicates. intern-list reissues Airtable record ids
+// for reposted listings, so the same job accumulates under several
+// external_ids over time — the in-run dedupe above only ever sees one run's
+// rows, so it cannot catch these. Deactivate rather than delete: reversible,
+// hides them from the feed immediately, and the archival sweep retires them
+// permanently once they age out.
+//
+// Two rows are only treated as the same posting when neither carries extra
+// information: intern-list synthesizes its URL from company+title, so
+// identical company+title always means an identical link. That is why this
+// is scoped to intern-list and never applied across ATS sources, where the
+// same company+title routinely means distinct per-location requisitions.
+const purgedIds = new Set(toPurge);
+const liveStored = stored.filter((r) => r.active !== false && !purgedIds.has(r.id));
+const coveredByBetter = new Set(
+  liveStored.filter((r) => r.source !== 'internlist').map(normKey)
+);
+const redundantIds = [];
+const bestByKey = new Map();
+for (const r of liveStored.filter((r) => r.source === 'internlist')) {
+  const k = normKey(r);
+  if (coveredByBetter.has(k)) { redundantIds.push(r.id); continue; }
+  const prev = bestByKey.get(k);
+  if (!prev) { bestByKey.set(k, r); continue; }
+  // Keep whichever intern-list row we saw most recently; retire the other.
+  const [keep, drop] = new Date(r.first_seen) > new Date(prev.first_seen) ? [r, prev] : [prev, r];
+  bestByKey.set(k, keep);
+  redundantIds.push(drop.id);
+}
+for (let i = 0; i < redundantIds.length; i += 100) {
+  const { error } = await sb.from('job_postings').update({ active: false }).in('id', redundantIds.slice(i, i + 100));
+  if (error) throw error;
+}
+if (redundantIds.length) {
+  console.log(`Deactivated ${redundantIds.length} redundant intern-list postings (already covered by a better source, or superseded by a newer row)`);
 }
 
 // Roll old intern-list rows off into job_postings_archive so the live table
