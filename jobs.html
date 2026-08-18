@@ -679,7 +679,12 @@ function renderApps() {
     const isSearch = a.job?.ats === 'search'; // internlist: no direct posting link exists
     const manualChip = manual
       ? ` <span class="chip manual">${isSearch ? '🔍 search to apply' : `✋ manual apply · ${esc(a.job.ats || '?')}`}</span>` : '';
-    const manualHint = manual && a.status !== 'submitted'
+    // Terminal outcomes are a record, not a to-do: suppress the how-to-apply
+    // guidance and the actions that contradict the outcome, so they read as a
+    // quiet entry the way submitted always has. Retry stays available — it's
+    // the only route back from abandoned.
+    const terminal = a.status === 'submitted' || a.status === 'abandoned';
+    const manualHint = manual && !terminal
       ? `<div class="detail">${isSearch
           ? '🔍 This came from an aggregator with no working apply link — the job link is a search for the real posting (usually the top result), open it, apply yourself, then hit "✓ Mark submitted".'
           : `🤖 The bot can't fill ${esc(a.job.ats || 'this')} forms — open the job link, apply yourself, then hit "✓ Mark submitted".`}</div>` : '';
@@ -699,7 +704,7 @@ function renderApps() {
       ? `<button class="ghost" onclick="retryApp('${a.id}')">Retry</button>` : '';
     const stuckHint = stuckApplying
       ? '<div class="detail">⚠️ An apply run started this and never finished. Retry puts it back in the cart.</div>' : '';
-    const markDone = a.status !== 'submitted' && (a.status !== 'applying' || stuckApplying)
+    const markDone = !terminal && (a.status !== 'applying' || stuckApplying)
       ? `<button class="ghost" onclick="markSubmitted('${a.id}')" title="I submitted this myself">✓ Mark submitted</button>` : '';
     const abandon = a.status !== 'submitted' && a.status !== 'applying' && a.status !== 'abandoned'
       ? `<button class="ghost" onclick="markAbandoned('${a.id}')" title="Giving up on this one — keep it for the record">🗑 Abandoned</button>` : '';
