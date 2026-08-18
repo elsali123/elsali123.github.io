@@ -277,6 +277,10 @@ let sb, user = null, jobs = [], apps = [], profile = null;
 let notes = {}, editingNote = null;   // job_id → note text; job_id being edited
 let sourceFilter = 'main';            // 'main' | 'internlist' | 'all'
 let appFilter = 'all';                // applications tab: 'all' | a status name
+// How long an application may sit in 'applying' before it's treated as
+// abandoned by a crashed run rather than genuinely in flight. Comfortably
+// longer than a real fill takes, so a live run is never offered a Retry.
+const STUCK_APPLYING_MS = 60 * 60 * 1000;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -683,9 +687,19 @@ function renderApps() {
       ? `<details class="answers"><summary class="meta">answers used (${Object.keys(a.answers).length})</summary><dl>` +
         Object.entries(a.answers).map(([q, v]) => `<dt>${esc(q)}</dt><dd>${esc(v)}</dd>`).join('') +
         '</dl></details>' : '';
-    const retry = (a.status === 'failed' || a.status === 'needs_review' || a.status === 'abandoned')
+    // 'applying' means a run claimed the row and never reported back. Nothing
+    // reclaims that state, so such a row otherwise has no actions at all —
+    // no Retry, no Mark submitted — and is stranded until someone edits the
+    // database by hand. Offer the normal actions once it's old enough that no
+    // run could still be working on it.
+    const stuckApplying = a.status === 'applying'
+      && Date.now() - new Date(a.updated_at).getTime() > STUCK_APPLYING_MS;
+    const retry = (a.status === 'failed' || a.status === 'needs_review'
+                   || a.status === 'abandoned' || stuckApplying)
       ? `<button class="ghost" onclick="retryApp('${a.id}')">Retry</button>` : '';
-    const markDone = a.status !== 'submitted' && a.status !== 'applying'
+    const stuckHint = stuckApplying
+      ? '<div class="detail">⚠️ An apply run started this and never finished. Retry puts it back in the cart.</div>' : '';
+    const markDone = a.status !== 'submitted' && (a.status !== 'applying' || stuckApplying)
       ? `<button class="ghost" onclick="markSubmitted('${a.id}')" title="I submitted this myself">✓ Mark submitted</button>` : '';
     const abandon = a.status !== 'submitted' && a.status !== 'applying' && a.status !== 'abandoned'
       ? `<button class="ghost" onclick="markAbandoned('${a.id}')" title="Giving up on this one — keep it for the record">🗑 Abandoned</button>` : '';
@@ -704,6 +718,7 @@ function renderApps() {
         } · updated ${new Date(a.updated_at).toLocaleString()}${noteLink(a.job_id)}</div>
         ${noteBlock(a.job_id)}
         ${manualHint}
+        ${stuckHint}
         ${a.detail ? `<div class="detail">${esc(a.detail)}</div>` : ''}
         ${answers}
       </div>
