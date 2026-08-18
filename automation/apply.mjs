@@ -1,7 +1,7 @@
 // Apply worker: picks up queued applications from Supabase, fills each with
 // Playwright, emails a status summary. Submission always requires a human in
 // the loop (ASSIST/HEADED session or explicit AUTO_SUBMIT=1).
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
@@ -78,16 +78,23 @@ async function getProfile(userId) {
     catch (e) { console.warn(e.message); }
   }
 
-  // Extract resume text once for LLM context, persist for future runs.
-  if (!p.resume_text) {
-    try {
-      const buf = await (await sb.storage.from('job-docs').download(p.resume_path)).data.arrayBuffer();
-      const pdf = await getDocumentProxy(new Uint8Array(buf));
-      const { text } = await extractText(pdf, { mergePages: true });
-      p.resume_text = text.slice(0, 15000);
-      await sb.from('job_profile').update({ resume_text: p.resume_text }).eq('user_id', userId);
-    } catch (e) { console.warn('resume text extraction failed:', e.message); }
-  }
+  // Resume text is the LLM's context for answering application questions, so
+  // it has to match the PDF actually being submitted. This used to extract
+  // only when the column was empty, which meant uploading a revised resume
+  // never invalidated it — answers kept citing the previous version's roles
+  // and dates. Re-extract every run from the copy just downloaded (no extra
+  // fetch), and only write back when it actually changed.
+  try {
+    const pdf = await getDocumentProxy(new Uint8Array(await readFile(files.resume)));
+    const { text } = await extractText(pdf, { mergePages: true });
+    const fresh = text.slice(0, 15000);
+    if (fresh && fresh !== p.resume_text) {
+      const stale = Boolean(p.resume_text);
+      p.resume_text = fresh;
+      await sb.from('job_profile').update({ resume_text: fresh }).eq('user_id', userId);
+      console.log(stale ? '📄 resume text refreshed — PDF changed since last run' : '📄 resume text extracted');
+    }
+  } catch (e) { console.warn('resume text extraction failed:', e.message); }
 
   p.draftedAnswers = await loadDraftedAnswers().catch((e) => { console.warn('drafted answers unavailable:', e.message); return {}; });
 
