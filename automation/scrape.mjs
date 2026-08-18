@@ -110,30 +110,23 @@ if (internlistSeenIds.size) {
   console.log('internlist fetch returned nothing this run — skipping staleness cleanup to be safe');
 }
 
-// Roll off old, inactive intern-list rows so the table can't grow unbounded
-// again — intern-list mints a fresh Airtable record id for many
-// reposted/duplicate listings, so raw accumulation over months of hourly
-// runs previously ballooned this table into the hundreds of thousands of
-// rows and degraded query performance project-wide. Capped per run so a
-// large backlog can't make a single scrape run long or time out.
-const STALE_CUTOFF_DAYS = 14;
-const MAX_DELETE_PER_RUN = 5000;
-const DELETE_BATCH = 200; // larger batches can exceed the REST API's URL length limit
-const staleCutoff = new Date(Date.now() - STALE_CUTOFF_DAYS * 864e5).toISOString();
-let totalRolledOff = 0;
-while (totalRolledOff < MAX_DELETE_PER_RUN) {
-  let q = sb.from('job_postings').select('id')
-    .eq('source', 'internlist').eq('active', false).lt('first_seen', staleCutoff)
-    .limit(DELETE_BATCH);
-  if (referencedIds.size) q = q.not('id', 'in', `(${[...referencedIds].join(',')})`);
-  const { data: toDelete, error: selErr } = await q;
-  if (selErr) { console.warn('rolling internlist cleanup select failed:', selErr.message); break; }
-  if (!toDelete?.length) break;
-  const { error: delErr } = await sb.from('job_postings').delete().in('id', toDelete.map((r) => r.id));
-  if (delErr) { console.warn('rolling internlist cleanup delete failed:', delErr.message); break; }
-  totalRolledOff += toDelete.length;
-}
-if (totalRolledOff) console.log(`Rolling cleanup: purged ${totalRolledOff} internlist postings inactive for ${STALE_CUTOFF_DAYS}+ days`);
+// Roll old intern-list rows off into job_postings_archive so the live table
+// can't grow unbounded again — intern-list mints a fresh Airtable record id
+// for many reposted/duplicate listings, so raw accumulation over months of
+// hourly runs ballooned this table into the hundreds of thousands of rows and
+// degraded query performance project-wide.
+//
+// The move is a single atomic statement inside archive_stale_internlist()
+// (see supabase/archive-internlist.sql), which also refuses to touch any
+// posting an application references — applications.job_id cascades on delete.
+// Non-fatal: if the function hasn't been installed yet, the scrape still
+// succeeds and just skips the roll-off.
+const { data: archivedCount, error: archiveErr } = await sb.rpc('archive_stale_internlist', {
+  batch_limit: 5000,
+  cutoff_days: 14,
+});
+if (archiveErr) console.warn('rolling internlist archival skipped:', archiveErr.message);
+else if (archivedCount) console.log(`Rolling cleanup: archived ${archivedCount} stale internlist postings`);
 
 const { data: fresh, error: freshErr } = await sb
   .from('job_postings')
