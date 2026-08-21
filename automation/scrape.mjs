@@ -40,8 +40,23 @@ async function selectAll(table, columns, filter) {
 }
 
 // US internships only.
-const rows = allRows.filter((r) => isUSLocation(r.locations));
-console.log(`US filter: ${allRows.length} → ${rows.length} rows`);
+const usRows = allRows.filter((r) => isUSLocation(r.locations));
+console.log(`US filter: ${allRows.length} → ${usRows.length} rows`);
+
+// Ingest must never accept a row the purge below deletes, or the two fight
+// forever: the purge drops it, the next hourly run re-inserts it with a fresh
+// first_seen, and — because the feed sorts by first_seen desc — it floats
+// back to the top of the dashboard every hour. simplify was the main
+// offender: it filters on the source repo's `terms` array and never consults
+// the title, so PhD/Master's-only and Spring-term roles kept reappearing.
+//
+// Sources may still use extra signals to decide *which* term a posting is for
+// (a repo's terms array, a job description); the title just has to survive
+// the same title-only check the purge applies.
+const rows = usRows.filter((r) => classifyPosting(r.title));
+if (rows.length !== usRows.length) {
+  console.log(`Title gate: ${usRows.length} → ${rows.length} rows (dropped ${usRows.length - rows.length} the purge would delete anyway)`);
+}
 
 // How good a row's apply link is, lower = better. A direct ATS row links
 // straight at the application form; simplify links at the employer's real
