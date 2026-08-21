@@ -26,10 +26,17 @@ for (const r of results) if (r.status === 'rejected') console.warn('source faile
 
 // Fetch every row from a table, paginating past PostgREST's default 1000-row
 // cap — with 2000+ postings now stored, a plain .select() silently truncates.
+//
+// The .order('id') is load-bearing, not cosmetic: OFFSET paging without a
+// stable sort lets Postgres return rows in a different order per request, so
+// a row can land on both sides of a page boundary — appearing twice, or (the
+// damaging case) never appearing at all. Callers use the result to decide
+// what to purge or deactivate, so a silently-missing row is one that quietly
+// escapes cleanup and reappears the next run.
 async function selectAll(table, columns, filter) {
   const out = [];
   for (let from = 0; ; from += 1000) {
-    let q = sb.from(table).select(columns).range(from, from + 999);
+    let q = sb.from(table).select(columns).order('id').range(from, from + 999);
     if (filter) q = filter(q);
     const { data, error } = await q;
     if (error) throw error;
