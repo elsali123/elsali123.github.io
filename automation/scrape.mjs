@@ -197,9 +197,13 @@ if (redundantIds.length) {
 // posting an application references — applications.job_id cascades on delete.
 // Non-fatal: if the function hasn't been installed yet, the scrape still
 // succeeds and just skips the roll-off.
+// 2 days, not 14: intern-list deactivates roughly a thousand rows an hour, so
+// a 14-day retention window held ~250k dead rows at steady state — enough to
+// time out company/title lookups. The batch is sized to drain the existing
+// backlog within about a day of hourly runs.
 const { data: archivedCount, error: archiveErr } = await sb.rpc('archive_stale_internlist', {
-  batch_limit: 5000,
-  cutoff_days: 14,
+  batch_limit: 20000,
+  cutoff_days: 2,
 });
 if (archiveErr) console.warn('rolling internlist archival skipped:', archiveErr.message);
 else if (archivedCount) console.log(`Rolling cleanup: archived ${archivedCount} stale internlist postings`);

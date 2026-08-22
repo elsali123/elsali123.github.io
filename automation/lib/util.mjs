@@ -154,6 +154,15 @@ export function postingKey(url) {
   } catch { return 'raw:' + url.toLowerCase(); }
 }
 
+// Stable identity for a posting, independent of whatever id a source happens
+// to hand out this fetch. Used both to spot the same job arriving from two
+// sources and, for intern-list, as the upsert key itself — its Airtable
+// record ids are reissued on repost, so keying on them made every repost a
+// brand-new row.
+export function identityKey(company, title) {
+  return `${company ?? ''}|${title ?? ''}`.toLowerCase().replace(/[^a-z0-9|]/g, '');
+}
+
 export function detectAts(url) {
   const u = (url || '').toLowerCase();
   // gh_jid= marks a Greenhouse board embedded in a company's own site

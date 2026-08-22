@@ -1,7 +1,7 @@
 // Job sources. Each fetcher returns rows shaped for the job_postings table:
 // { source, ats, external_id, company, title, locations, url, term, posted_at, raw }
 // All fetchers are best-effort: a failing company/repo logs and is skipped.
-import { classifyPosting, detectAts, fetchJson, TARGET_TERMS } from './util.mjs';
+import { classifyPosting, detectAts, fetchJson, identityKey, TARGET_TERMS } from './util.mjs';
 
 // ---------- SimplifyJobs GitHub repos ----------
 // The community keeps structured listings at .github/scripts/listings.json on
@@ -85,7 +85,14 @@ export async function fetchInternList() {
         const url = `https://www.google.com/search?q=${encodeURIComponent(`${company} ${title} internship apply`)}`;
         rows.push({
           source: 'internlist', ats: 'search',
-          external_id: r.id,
+          // Keyed on the job's identity, not r.id: intern-list reissues
+          // Airtable record ids when a listing is reposted, and external_id is
+          // half the upsert key — so keying on r.id made every repost insert a
+          // new row instead of updating the existing one, accumulating a
+          // quarter-million rows. Safe to collapse identical company+title
+          // here (and only here) because the url below is *derived* from
+          // exactly those two fields, so such rows are indistinguishable.
+          external_id: identityKey(company, title),
           company, title,
           locations: String(cell['Location'] || '').replace(/\s*\n\s*/g, '; '),
           url, term,
