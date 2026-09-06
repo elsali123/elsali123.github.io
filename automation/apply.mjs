@@ -103,6 +103,20 @@ async function getProfile(userId) {
   return entry;
 }
 
+// Playwright reports a closed tab/window as an error on whatever call happens
+// to touch the page next. Closing the tab right after clicking submit is the
+// normal way a hand-submission ends, so this must never be recorded as a
+// failure — 'failed' means the bot broke, and burying real breakage under
+// dozens of these makes the status column useless.
+const isTargetClosed = (e) =>
+  /target (page|closed|crashed)|context or browser has been closed/i.test(e?.message || '');
+
+// Post-submit confirmation, matched two ways because the tab often closes
+// within a second of the click: page text (polled) and the main frame's URL
+// (captured on navigation, so it survives the page being gone).
+const CONFIRM_TEXT_RE = /thank you|application (submitted|received|complete)|we('|’)ve received|successfully submitted/i;
+const CONFIRM_URL_RE = /confirmation|thank[-_]?you|application[-_]?(submitted|received|complete)|\bsubmitted\b/i;
+
 // ---- Work the queue ----
 const browser = await chromium.launch({ headless: !HEADED, slowMo: HEADED ? 120 : 0 });
 const results = [];
@@ -162,17 +176,42 @@ for (const [idx, app] of queue.entries()) {
       const hold = Number(process.env.HOLD_SECONDS || 600);
       console.log(`  👤 Your turn — review and click submit (waiting up to ${Math.round(hold / 60)} min)…`);
       const deadline = Date.now() + hold * 1000;
+
+      // Latch the confirmation the instant the form navigates, rather than
+      // only when the next poll happens to catch it. Submitting and closing
+      // the tab in one motion is the common case, and anything we can only
+      // learn by reading the page is unrecoverable once it's closed.
       let confirmed = false;
-      while (Date.now() < deadline && !confirmed) {
-        confirmed = await page.evaluate(() =>
-          /thank you|application (submitted|received|complete)|we('|’)ve received|successfully submitted/i
-            .test(document.body.innerText)).catch(() => false);
-        if (!confirmed) await page.waitForTimeout(5000);
+      page.on('framenavigated', (frame) => {
+        if (frame === page.mainFrame() && CONFIRM_URL_RE.test(frame.url())) confirmed = true;
+      });
+
+      let closed = false;
+      while (Date.now() < deadline && !confirmed && !closed) {
+        if (page.isClosed()) { closed = true; break; }
+        confirmed = await page
+          .evaluate((src) => new RegExp(src, 'i').test(document.body.innerText), CONFIRM_TEXT_RE.source)
+          .catch(() => { closed = page.isClosed(); return false; });
+        // A page-independent sleep. page.waitForTimeout() rejects the moment
+        // the tab closes, and that rejection escaped to the catch below —
+        // which is how a successfully hand-submitted application ended up
+        // recorded as 'failed'.
+        if (!confirmed && !closed) await new Promise((res) => setTimeout(res, 1000));
       }
-      r = confirmed
-        ? { ...r, status: 'submitted', detail: 'Submitted manually in assisted session' }
-        : { ...r, status: 'needs_review', detail: 'Assisted session ended without submission' };
-      console.log(confirmed ? '  ✅ manual submission confirmed' : '  ⏭ not submitted — leaving as needs_review');
+
+      if (confirmed) {
+        r = { ...r, status: 'submitted', detail: 'Submitted manually in assisted session' };
+        console.log('  ✅ manual submission confirmed');
+      } else if (closed) {
+        // You reviewed this one and closed the tab, which in practice means
+        // you decided against it. 'abandoned' renders quietly on the
+        // dashboard, so passing on a job doesn't build a to-do list.
+        r = { ...r, status: 'abandoned', detail: 'Closed during review in assisted session' };
+        console.log('  🗑 closed after review — marking abandoned');
+      } else {
+        r = { ...r, status: 'needs_review', detail: 'Assisted session ended without submission' };
+        console.log('  ⏭ not submitted — leaving as needs_review');
+      }
     }
     await setStatus(app.id, r.status, r.detail, r.answers); // no-op in DRY_RUN
     results.push({ tag, ...r, url: job.url });
@@ -187,10 +226,22 @@ for (const [idx, app] of queue.entries()) {
       }
     }
   } catch (e) {
-    await page.screenshot({ path: `failure-${app.id}.png`, fullPage: true }).catch(() => {});
-    await setStatus(app.id, 'failed', e.message);
-    results.push({ tag, status: 'failed', detail: e.message, url: job.url });
-    console.warn(`  → failed: ${e.message}`);
+    // A closed tab is the human ending the session, not the automation
+    // breaking. Reaching HERE means it closed before the form was ever put in
+    // front of you (closing the window to stop a run blows through every
+    // remaining queue entry this way), so this one was never actually
+    // reviewed — send it back to 'ready' for the next session rather than
+    // quietly retiring work you haven't seen. Deciding against a job you DID
+    // review is the 'abandoned' branch above.
+    const closedTarget = isTargetClosed(e);
+    const status = closedTarget ? 'ready' : 'failed';
+    const detail = closedTarget
+      ? 'Session ended before this one was filled — requeued'
+      : e.message;
+    if (!closedTarget) await page.screenshot({ path: `failure-${app.id}.png`, fullPage: true }).catch(() => {});
+    await setStatus(app.id, status, detail);
+    results.push({ tag, status, detail, url: job.url });
+    console.warn(`  → ${status}: ${detail}`);
   } finally {
     await ctx.close();
   }
@@ -199,7 +250,7 @@ await browser.close();
 
 // ---- Status email ----
 if (DRY_RUN) { console.log('\n🧪 DRY RUN complete — no statuses changed, no email sent.'); process.exit(0); }
-const icon = { submitted: '✅', needs_review: '👀', failed: '❌' };
+const icon = { submitted: '✅', needs_review: '👀', failed: '❌', abandoned: '🗑', ready: '↩️' };
 const items = results.map((r) =>
   `<li>${icon[r.status] || '•'} <b>${esc(r.tag)}</b> — ${esc(r.status)}: ${esc(r.detail)}` +
   (r.url && r.status !== 'submitted' ? ` (<a href="${esc(r.url)}">open</a>)` : '') + '</li>').join('\n');
