@@ -47,6 +47,14 @@ function savedAnswer(label, common) {
   return null;
 }
 
+// Follow-up fields that only apply when a PREVIOUS answer was "Other"
+// ("If Other, please explain", "If you selected 'Other', please specify").
+// Nothing here ever picks "Other", so the honest value is blank — asking the
+// LLM just spends a call to invent an explanation for a choice that wasn't
+// made. Matched at the start of the label or after a sentence break, since
+// labelFor sometimes returns the parent question glued on the front.
+const OTHER_FOLLOWUP_RE = /(^|[.?!;:]\s*)if\s+(you\s+(selected|chose|picked|answered)\s+)?["'“”]?other\b/i;
+
 async function resolveAnswer(label, options, profile, job, answers) {
   // Education *date* questions ("Start month/year of university") would greedily
   // match the school/degree patterns — route them to saved answers / the LLM,
@@ -78,6 +86,12 @@ async function resolveAnswer(label, options, profile, job, answers) {
     console.log(`    📝 drafted answer — ${label.slice(0, 60)}`);
     answers[label] = `${drafted} (drafted)`;
     return drafted;
+  }
+  // Free-text only: a dropdown whose label reads "If other…" still needs a
+  // real selection, and every caller turns null into "pick the first option".
+  if (!options?.length && OTHER_FOLLOWUP_RE.test(label)) {
+    console.log(`    ⏭ left blank (conditional "Other" field) — ${label.slice(0, 60)}`);
+    return null;
   }
   const t = Date.now();
   const llm = await llmAnswer(label, options, profile, job);
