@@ -101,7 +101,13 @@
   .status.needs_review { background: rgba(255,152,0,.16); color: var(--amber); }
   .status.failed       { background: rgba(198,40,40,.12); color: var(--red); }
   .status.abandoned    { background: rgba(120,120,130,.16); color: #6d6577; }
-  .status.not_interested { background: rgba(120,120,130,.16); color: #6d6577; cursor: pointer; }
+  /* Disqualifier categories share one quiet grey "ruled out" pill. */
+  .status.not_interested, .status.grad_only, .status.citizenship,
+  .status.wrong_field, .status.wrong_term, .status.not_us,
+  .status.already_applied, .status.posting_gone, .status.rejected,
+  .status.part_time, .status.hs_only, .status.app_limit_reached {
+    background: rgba(120,120,130,.16); color: #6d6577; cursor: pointer; }
+  /* Not a disqualifier — a caution that changes HOW you apply. */
   .status.one_app_only   { background: rgba(255,152,0,.16); color: var(--amber); cursor: pointer; }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .filters input, .filters select { width: auto; }
@@ -372,11 +378,32 @@ async function loadAll() {
 
 // ---------- job notes & categories ----------
 // Category renders as a status-style pill (like submitted/staged); click to edit.
+// Categories offered in the note editor, ordered by how often the matching
+// reason actually showed up in free-text notes: grad/PhD-only dominated, then
+// citizenship, field mismatch, wrong term. [value, dropdown label, pill label].
+const NOTE_CATEGORIES = [
+  ['not_interested',  '🚫 no longer interested',                '🚫 not interested'],
+  ['grad_only',       '🎓 grad / PhD / Masters only',           '🎓 grad only'],
+  ['citizenship',     '🇺🇸 citizenship or clearance required', '🇺🇸 citizenship'],
+  ['wrong_field',     '🧭 wrong field or major',                '🧭 wrong field'],
+  ['wrong_term',      '📅 wrong term (fall/spring/year-round)', '📅 wrong term'],
+  ['not_us',          '🌍 outside the US',                      '🌍 not US'],
+  ['already_applied', '🔁 already applied / duplicate',         '🔁 already applied'],
+  ['posting_gone',    '💀 posting no longer exists',            '💀 posting gone'],
+  ['rejected',        '❌ already rejected',                        '❌ rejected'],
+  ['part_time',       '⏳ part-time, not full-time',           '⏳ part-time'],
+  ['hs_only',         '🎒 high school / pre-college only',      '🎒 high school'],
+  ['app_limit_reached', '🛑 hit this company\u2019s app limit',   '🛑 app limit'],
+  ['one_app_only',    '☝️ one application only',              '☝️ one app only'],
+];
+const CAT_PILL = Object.fromEntries(NOTE_CATEGORIES.map(([v, , pill]) => [v, pill]));
+
 function catPill(jobId) {
   const c = notes[jobId]?.category;
   if (!c) return '';
-  const label = c === 'not_interested' ? '🚫 not interested' : '☝️ one app only';
-  return `<span class="status ${c}" title="click to edit" onclick="editNote('${jobId}')">${label}</span>`;
+  // Fall back to the stored value so a category later dropped from the list
+  // still renders instead of silently becoming a blank pill.
+  return `<span class="status ${c}" title="click to edit" onclick="editNote('${jobId}')">${CAT_PILL[c] || esc(c)}</span>`;
 }
 function noteBlock(jobId) {
   if (editingNote === jobId) {
@@ -390,8 +417,7 @@ function noteBlock(jobId) {
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
         <select style="width:auto">
           <option value="">no category</option>
-          <option value="not_interested"${sel('not_interested')}>🚫 no longer interested</option>
-          <option value="one_app_only"${sel('one_app_only')}>☝️ one application only</option>
+          ${NOTE_CATEGORIES.map(([v, label]) => `<option value="${v}"${sel(v)}>${label}</option>`).join('')}
         </select>
         <button class="ghost" onclick="saveNote('${jobId}', this)">Save</button>
         <button class="ghost" onclick="editingNote=null;rerender()">Cancel</button>
