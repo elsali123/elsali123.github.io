@@ -7,3 +7,5 @@ automation/failure-*.png
 automation/.env.local
 automation/logs/
 application-answers.md
+
+*.pdf
