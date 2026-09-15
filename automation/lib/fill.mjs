@@ -55,6 +55,29 @@ function savedAnswer(label, common) {
 // labelFor sometimes returns the parent question glued on the front.
 const OTHER_FOLLOWUP_RE = /(^|[.?!;:]\s*)if\s+(you\s+(selected|chose|picked|answered)\s+)?["'“”]?other\b/i;
 
+// Same waste, different trigger: follow-ups that only apply when a PREVIOUS
+// answer was "Yes" ("If yes, please explain", "If you answered Yes to the
+// above question, please provide additional information"). Every yes/no
+// screener this profile answers comes back No — sponsorship, referral, prior
+// employment, convictions — so blank is the honest value and the LLM call
+// buys an explanation for something that never happened.
+//
+// Can't be decided by looking at the previous answer: fields are processed by
+// TYPE (text, then selects, then radios), so when this textarea is resolved
+// the yes/no question above it hasn't been answered yet.
+//
+// Stricter than the "Other" rule, which also fires after a sentence break.
+// labelFor sometimes glues the parent question onto the front, and
+// "Have you worked here? If yes, explain" is a SINGLE field that still needs
+// a real "No". Blank is right either way for "Other"; here it isn't. So:
+// anchor at the start of the label...
+const YES_FOLLOWUP_RE = /^["'“(\s]*if\s+(?:you\s+(?:answered|selected|chose|picked|said)\s+)?(?:(?:the|your)\s+answer\s+(?:is|was)\s+)?["'“”]?(?:yes|so)\b/i;
+// ...except when the conditional names the other question outright — by
+// position ("to the above question") or by quoting it ("Required if you
+// answered 'yes' to \"have you been employed with us before\""). Only a
+// standalone follow-up field ever refers to a question that way.
+const YES_REFERS_ABOVE_RE = /if\s+(?:you\s+(?:answered|selected|chose|picked|said)\s+)?["'“”]?yes\b["'“”]?(?:[^.?!]{0,40}\b(?:above|previous|preceding|prior)\b|\s*(?:to|for)\s+["'“])/i;
+
 async function resolveAnswer(label, options, profile, job, answers) {
   // Education *date* questions ("Start month/year of university") would greedily
   // match the school/degree patterns — route them to saved answers / the LLM,
@@ -89,9 +112,14 @@ async function resolveAnswer(label, options, profile, job, answers) {
   }
   // Free-text only: a dropdown whose label reads "If other…" still needs a
   // real selection, and every caller turns null into "pick the first option".
-  if (!options?.length && OTHER_FOLLOWUP_RE.test(label)) {
-    console.log(`    ⏭ left blank (conditional "Other" field) — ${label.slice(0, 60)}`);
-    return null;
+  if (!options?.length) {
+    const conditional = OTHER_FOLLOWUP_RE.test(label) ? 'Other'
+      : (YES_FOLLOWUP_RE.test(label) || YES_REFERS_ABOVE_RE.test(label)) ? 'Yes'
+      : null;
+    if (conditional) {
+      console.log(`    ⏭ left blank (conditional "${conditional}" field) — ${label.slice(0, 60)}`);
+      return null;
+    }
   }
   const t = Date.now();
   const llm = await llmAnswer(label, options, profile, job);
